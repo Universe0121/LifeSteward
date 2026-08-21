@@ -1,2 +1,1 @@
-"""Tests for the LifeAgent backend."""
-
+"""LifeAgent test package."""
