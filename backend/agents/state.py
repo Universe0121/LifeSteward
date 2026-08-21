@@ -1,20 +1,17 @@
-"""Shared state passed between LifeAgent agents."""
+"""Shared state passed between every LifeAgent Agent."""
 
-from typing import Any, Dict, List, TypedDict
+from typing import Any, TypedDict
 
 
 class AgentState(TypedDict):
-    """Unified state contract for all LifeAgent agents."""
-
-    user_id: int
+    user_id: str
     conversation_id: str
     user_input: str
     intent: str
-    extracted_events: List[Dict[str, Any]]
-    retrieved_memories: List[Dict[str, Any]]
-    user_profile: Dict[str, Any]
-    current_goal: Dict[str, Any]
-    generated_plan: List[Dict[str, Any]]
-    reflection_result: Dict[str, Any]
+    extracted_events: list[dict[str, Any]]
+    retrieved_memories: list[dict[str, Any]]
+    user_profile: dict[str, Any]
+    current_goal: dict[str, Any]
+    generated_plan: list[dict[str, Any]]
+    reflection_result: dict[str, Any]
     assistant_response: str
-
