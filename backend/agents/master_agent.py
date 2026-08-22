@@ -2,6 +2,7 @@
 
 import json
 from collections.abc import Callable
+from copy import deepcopy
 
 from agents.intent import Intent
 from agents.interaction_agent import InteractionAgent
@@ -12,6 +13,16 @@ from core.llm_service import LLMService, get_llm_service, load_prompt
 
 class MasterAgent:
     _prompt_name = "intent_classification_prompt.md"
+    _default_state_values: dict[str, object] = {
+        "intent": "",
+        "extracted_events": [],
+        "retrieved_memories": [],
+        "user_profile": {},
+        "current_goal": {},
+        "generated_plan": [],
+        "reflection_result": {},
+        "assistant_response": "",
+    }
 
     def __init__(
         self,
@@ -69,4 +80,5 @@ class MasterAgent:
 
     @staticmethod
     def _initialize_state(state: AgentState) -> None:
-        state.setdefault("intent", "")
+        for key, value in MasterAgent._default_state_values.items():
+            state.setdefault(key, deepcopy(value))
