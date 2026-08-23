@@ -7,6 +7,7 @@ from agents.intent import Intent
 from agents.interaction_agent import InteractionAgent
 from agents.life_understanding_agent import LifeUnderstandingAgent
 from agents.memory_agent import MemoryAgent
+from agents.reflection_agent import ReflectionAgent
 from agents.state import AgentState
 from core.llm_service import LLMService, get_llm_service, load_prompt
 from services.memory_service import InMemoryMemoryService, MemoryService
@@ -22,6 +23,7 @@ class MasterAgent:
         interaction_agent: InteractionAgent | None = None,
         memory_agent: MemoryAgent | None = None,
         llm_service: LLMService | None = None,
+        reflection_agent: ReflectionAgent | None = None,
     ) -> None:
         self._life_understanding_agent = (
             life_understanding_agent or LifeUnderstandingAgent(llm_service)
@@ -30,6 +32,7 @@ class MasterAgent:
         self._memory_agent = memory_agent or MemoryAgent(
             memory_service or InMemoryMemoryService()
         )
+        self._reflection_agent = reflection_agent or ReflectionAgent(llm_service)
         self._llm_service = llm_service
         self._intent_handlers: dict[
             str,
@@ -40,7 +43,10 @@ class MasterAgent:
                 self._memory_agent.process,
             ),
             Intent.QUERY_MEMORY.value: (self._memory_agent.process,),
-            Intent.REFLECTION.value: (self._memory_agent.process,),
+            Intent.REFLECTION.value: (
+                self._memory_agent.process,
+                self._reflection_agent.process,
+            ),
             Intent.PLANNING.value: (self._memory_agent.process,),
         }
 
