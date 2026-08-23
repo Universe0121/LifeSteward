@@ -29,7 +29,10 @@ class FailingMemoryService(MemoryService):
     def search_memory(self, user_id: str, memory_query: str, top_k: int = 5):
         raise RuntimeError("memory unavailable")
 
-    def save_events(self, user_id: str, events: list[dict]):
+    def save_memory(self, user_id: str, events: list[dict]):
+        raise RuntimeError("memory unavailable")
+
+    def update_user_profile(self, user_id: str, user_profile: dict):
         raise RuntimeError("memory unavailable")
 
     def compress_memory(self, events: list[dict]):
@@ -115,3 +118,4 @@ class MemoryAgentTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
