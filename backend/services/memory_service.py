@@ -6,6 +6,10 @@ from collections.abc import Iterable
 from copy import deepcopy
 from typing import Any
 
+from core.llm_service import LLMService
+from tools.sql_tool import SQLTool
+from tools.vector_search_tool import VectorSearchTool
+
 
 class MemoryService:
     """Interface between MemoryAgent and persistence/retrieval tools."""
@@ -18,11 +22,59 @@ class MemoryService:
     ) -> list[dict[str, Any]]:
         raise NotImplementedError
 
-    def save_events(self, user_id: str, events: list[dict[str, Any]]) -> None:
+    def save_memory(self, user_id: str, events: list[dict[str, Any]]) -> None:
+        raise NotImplementedError
+
+    def update_user_profile(self, user_id: str, user_profile: dict[str, Any]) -> None:
         raise NotImplementedError
 
     def compress_memory(self, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         raise NotImplementedError
+
+
+class ToolMemoryService(MemoryService):
+    """Production memory orchestration over the agreed Tool boundaries."""
+
+    def __init__(self, sql_tool: SQLTool, vector_search_tool: VectorSearchTool, llm_service: LLMService) -> None:
+        self._sql_tool = sql_tool
+        self._vector_search_tool = vector_search_tool
+        self._llm_service = llm_service
+
+    def search_memory(self, user_id: str, memory_query: str, top_k: int = 5) -> list[dict[str, Any]]:
+        if not memory_query.strip():
+            return []
+        query_embedding = self._llm_service.embed_text(memory_query)
+        if not query_embedding:
+            return []
+        return self._vector_search_tool.search_memories(user_id, query_embedding, top_k)
+
+    def save_memory(self, user_id: str, events: list[dict[str, Any]]) -> None:
+        normalized_events = []
+        for event in events:
+            normalized_event = deepcopy(event)
+            normalized_event.setdefault("user_id", user_id)
+            normalized_events.append(normalized_event)
+        if not normalized_events:
+            return
+        self._sql_tool.save_life_events(normalized_events)
+        for event in normalized_events:
+            memory_content = str(event.get("memory_content") or event.get("event_content") or "").strip()
+            if not memory_content:
+                continue
+            new_memory = {
+                "user_id": user_id,
+                "memory_type": event.get("event_type", "life_event"),
+                "memory_content": memory_content,
+                "embedding": self._llm_service.embed_text(memory_content),
+                "source_event": event,
+            }
+            self._vector_search_tool.save_memory(new_memory)
+
+    def update_user_profile(self, user_id: str, user_profile: dict[str, Any]) -> None:
+        self._sql_tool.update_user_profile(user_id, user_profile)
+
+    def compress_memory(self, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        return deepcopy(events)
 
 
 class FakeMemoryService(MemoryService):
@@ -85,7 +137,7 @@ class FakeMemoryService(MemoryService):
                 matched_memories.append(memory)
         return deepcopy(matched_memories[:top_k])
 
-    def save_events(self, user_id: str, events: list[dict[str, Any]]) -> None:
+    def save_memory(self, user_id: str, events: list[dict[str, Any]]) -> None:
         copied_events = deepcopy(events)
         self.save_calls.append({"user_id": user_id, "events": copied_events})
         for event in copied_events:
@@ -98,6 +150,9 @@ class FakeMemoryService(MemoryService):
 
     def compress_memory(self, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return deepcopy(events)
+
+    def update_user_profile(self, user_id: str, user_profile: dict[str, Any]) -> None:
+        return None
 
 
 class MockMemoryService(FakeMemoryService):
@@ -121,3 +176,4 @@ class MockMemoryService(FakeMemoryService):
 
 
 InMemoryMemoryService = FakeMemoryService
+
