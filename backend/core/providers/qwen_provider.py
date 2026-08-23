@@ -1,10 +1,11 @@
 """Qwen adapter using the DashScope OpenAI-compatible API."""
 
 import json
+import time
 from collections.abc import Mapping
 from typing import Any
 
-from core.llm_service import LLMService
+from core.llm_service import LLMResponseError, LLMService, LLMTimeoutError
 
 
 DASHSCOPE_COMPATIBLE_BASE_URL = (
@@ -20,6 +21,10 @@ class QwenProvider(LLMService):
         base_url: str = DASHSCOPE_COMPATIBLE_BASE_URL,
         temperature: float = 0.7,
         client: Any | None = None,
+        timeout: float = 30.0,
+        max_retries: int = 3,
+        retry_backoff: float = 0.2,
+        embedding_model_name: str = "text-embedding-v3",
     ) -> None:
         if not api_key:
             raise ValueError("DASHSCOPE_API_KEY is required")
@@ -39,27 +44,60 @@ class QwenProvider(LLMService):
         self._client = client
         self._model_name = model_name
         self._temperature = temperature
+        self._timeout = timeout
+        self._max_retries = max(0, int(max_retries))
+        self._retry_backoff = max(0.0, float(retry_backoff))
+        self._embedding_model_name = embedding_model_name
 
     def generate(self, prompt: str, variables: Mapping[str, Any]) -> str:
-        response = self._client.chat.completions.create(
-            model=self._model_name,
-            temperature=self._temperature,
-            messages=[
+        request = {
+            "model": self._model_name,
+            "temperature": self._temperature,
+            "messages": [
                 {"role": "system", "content": prompt},
-                {
-                    "role": "user",
-                    "content": json.dumps(
-                        dict(variables),
-                        ensure_ascii=False,
-                        default=str,
-                    ),
-                },
+                {"role": "user", "content": json.dumps(dict(variables), ensure_ascii=False, default=str)},
             ],
-        )
-        content = self._extract_content(response)
-        if not content:
-            raise RuntimeError("Qwen returned an empty response")
-        return content.strip()
+            "timeout": self._timeout,
+        }
+        for attempt in range(self._max_retries + 1):
+            try:
+                content = self._extract_content(self._client.chat.completions.create(**request))
+                if not content:
+                    raise LLMResponseError("Qwen returned an empty response")
+                return content.strip()
+            except TimeoutError as exc:
+                if attempt == self._max_retries:
+                    raise LLMTimeoutError("Qwen request timed out") from exc
+            except Exception as exc:
+                if attempt == self._max_retries:
+                    if isinstance(exc, LLMResponseError):
+                        raise
+                    raise LLMResponseError(f"Qwen request failed after {attempt + 1} attempts: {exc}") from exc
+            if self._retry_backoff:
+                time.sleep(self._retry_backoff * (2**attempt))
+        raise LLMResponseError("Qwen request failed")
+
+    def embed_text(self, text: str) -> list[float]:
+        if not text.strip():
+            return []
+        try:
+            response = self._client.embeddings.create(
+                model=self._embedding_model_name,
+                input=text,
+                timeout=self._timeout,
+            )
+            data = response.get("data", []) if isinstance(response, Mapping) else getattr(response, "data", [])
+            first = data[0] if data else None
+            embedding = first.get("embedding") if isinstance(first, Mapping) else getattr(first, "embedding", None)
+            if not isinstance(embedding, list) or not embedding:
+                raise LLMResponseError("Qwen returned an invalid embedding")
+            return [float(value) for value in embedding]
+        except TimeoutError as exc:
+            raise LLMTimeoutError("Qwen embedding request timed out") from exc
+        except LLMResponseError:
+            raise
+        except Exception as exc:
+            raise LLMResponseError(f"Qwen embedding request failed: {exc}") from exc
 
     @classmethod
     def _extract_content(cls, response: Any) -> str:
