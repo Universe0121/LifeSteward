@@ -9,6 +9,7 @@ from pathlib import Path
 from core.database import DatabaseClient
 from core.llm_service import CallableLLMService
 from services.memory_service import ToolMemoryService
+from agents.master_agent import MasterAgent
 from tools.sql_tool import SQLTool
 from tools.vector_search_tool import VectorSearchTool
 
@@ -99,6 +100,40 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
         memories = service.search_memory(user_id, "最近睡眠情况", top_k=3)
         self.assertGreaterEqual(len(memories), 1)
         self.assertEqual(memories[0]["user_id"], user_id)
+
+    def test_real_acceptance_reflection_flow(self) -> None:
+        def generate(prompt, variables):
+            if set(variables) == {"user_input"}:
+                return '{"event_type":"sleep","event_content":"最近三天都只睡了5小时"}'
+            if variables.get("intent") == "reflection" or (
+                "retrieved_memories" in variables and variables["retrieved_memories"]
+            ):
+                return '{"status":"high_pressure","problem":"睡眠不足可能影响学习效率","suggestion":"优先补足睡眠并减少当天任务量"}'
+            return "已结合你的历史记录完成分析。"
+
+        service = ToolMemoryService(
+            SQLTool(database_client=self.database_client),
+            VectorSearchTool(database_client=self.database_client),
+            CallableLLMService(generate, lambda text: [0.41, 0.52, 0.63]),
+        )
+        user_id = "integration-acceptance-user"
+        master = MasterAgent(memory_service=service, llm_service=CallableLLMService(generate, lambda text: [0.41, 0.52, 0.63]))
+        state = {
+            "user_id": user_id,
+            "conversation_id": "acceptance-conversation",
+            "user_input": "最近三天都只睡了5小时",
+            "intent": "record_event",
+            "extracted_events": [], "retrieved_memories": [], "user_profile": {},
+            "current_goal": {}, "generated_plan": [], "reflection_result": {}, "assistant_response": "",
+        }
+        master.process(state)
+        state.update({"user_input": "今天学习效率很差", "intent": "record_event", "extracted_events": []})
+        master.process(state)
+        state.update({"user_input": "最近为什么学习效率下降？", "intent": "reflection", "extracted_events": []})
+        result = master.process(state)
+        self.assertGreaterEqual(len(result["retrieved_memories"]), 1)
+        self.assertEqual(result["reflection_result"]["status"], "high_pressure")
+        self.assertTrue(result["assistant_response"])
 
 
 if __name__ == "__main__":
