@@ -26,7 +26,7 @@ class MemoryAgent:
         try:
             if intent == Intent.RECORD_EVENT.value:
                 if extracted_events:
-                    self.memory_service.save_events(user_id, extracted_events)
+                    self.memory_service.save_memory(user_id, extracted_events)
                 return state
 
             if self._should_retrieve(intent):
