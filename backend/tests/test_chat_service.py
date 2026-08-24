@@ -13,6 +13,9 @@ from services.chat_service import (
     build_agent_state,
     process_chat_message,
 )
+from agents.master_agent import MasterAgent
+from core.llm_service import CallableLLMService
+from services.memory_service import FakeMemoryService
 
 
 @dataclass
@@ -106,6 +109,41 @@ class ChatServiceTestCase(unittest.TestCase):
             set(response_data.keys()),
             {"assistant_response", "intent", "extracted_events"},
         )
+
+    def test_real_master_agent_query_memory_round_trip(self) -> None:
+        memory = FakeMemoryService([{"event_content": "散步缓解压力", "event_type": "adjustment"}])
+
+        calls = []
+        def generate(prompt, variables):
+            calls.append(prompt)
+            if len(calls) == 1:
+                return '{"intent":"query_memory"}'
+            return "可以尝试散步。"
+
+        agent = MasterAgent(
+            memory_service=memory,
+            llm_service=CallableLLMService(generate),
+        )
+        response = process_chat_message(
+            ChatRequest(user_id=10001, conversation_id="conv001", user_input="我以前压力大时怎么调整？"),
+            master_agent=agent,
+        )
+        self.assertEqual(response.intent, "query_memory")
+        self.assertEqual(len(memory.search_calls), 1)
+        self.assertEqual(response.assistant_response, "可以尝试散步。")
+
+    def test_real_master_agent_casual_chat_does_not_query_memory(self) -> None:
+        memory = FakeMemoryService()
+        agent = MasterAgent(
+            memory_service=memory,
+            llm_service=CallableLLMService(lambda prompt, variables: '{"intent":"casual_chat"}'),
+        )
+        response = process_chat_message(
+            ChatRequest(user_id=10001, conversation_id="conv001", user_input="讲个笑话"),
+            master_agent=agent,
+        )
+        self.assertEqual(response.intent, "casual_chat")
+        self.assertEqual(memory.search_calls, [])
 
 
 if __name__ == "__main__":

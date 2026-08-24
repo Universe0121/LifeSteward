@@ -1,4 +1,4 @@
-"""PostgreSQL connection helpers for Day2 infrastructure."""
+"""PostgreSQL connection helpers for Day3 persistence work."""
 
 from __future__ import annotations
 
@@ -9,8 +9,10 @@ from core.settings import load_settings
 
 try:  # pragma: no cover - optional dependency branch
     import psycopg
+    from psycopg.rows import dict_row
 except ImportError:  # pragma: no cover - handled at runtime
     psycopg = None
+    dict_row = None
 
 
 @dataclass
@@ -32,7 +34,9 @@ class DatabaseHealth:
 class DatabaseClient:
     """Thin PostgreSQL client with pgvector health verification."""
 
-    def __init__(self, postgres_dsn: str) -> None:
+    def __init__(self, postgres_dsn: str | None = None) -> None:
+        if postgres_dsn is None:
+            postgres_dsn = load_settings().postgres_dsn
         if not postgres_dsn:
             raise ValueError("POSTGRES_DSN is required")
         self._postgres_dsn = postgres_dsn
@@ -46,6 +50,64 @@ class DatabaseClient:
         if psycopg is None:
             raise RuntimeError("psycopg is required for PostgreSQL access")
         return psycopg.connect(self._postgres_dsn, connect_timeout=5)
+
+    def fetch_all(
+        self,
+        query: str,
+        params: tuple[Any, ...] | list[Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Run a read query and return all rows as dictionaries."""
+
+        if psycopg is None:
+            raise RuntimeError("psycopg is required for PostgreSQL access")
+
+        with self.connect() as connection:
+            with connection.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(query, tuple(params or ()))
+                return [dict(row) for row in cursor.fetchall()]
+
+    def fetch_one(
+        self,
+        query: str,
+        params: tuple[Any, ...] | list[Any] | None = None,
+    ) -> dict[str, Any] | None:
+        """Run a query and return the first row as a dictionary."""
+
+        if psycopg is None:
+            raise RuntimeError("psycopg is required for PostgreSQL access")
+
+        with self.connect() as connection:
+            with connection.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(query, tuple(params or ()))
+                row = cursor.fetchone()
+                return dict(row) if row else None
+
+    def execute(
+        self,
+        query: str,
+        params: tuple[Any, ...] | list[Any] | None = None,
+    ) -> None:
+        """Run a statement that does not need a returned payload."""
+
+        if psycopg is None:
+            raise RuntimeError("psycopg is required for PostgreSQL access")
+
+        with self.connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(query, tuple(params or ()))
+
+    def execute_script(self, script: str) -> None:
+        """Execute a simple semicolon-delimited migration script."""
+
+        if psycopg is None:
+            raise RuntimeError("psycopg is required for PostgreSQL access")
+
+        statements = [statement.strip() for statement in script.split(";")]
+        with self.connect() as connection:
+            with connection.cursor() as cursor:
+                for statement in statements:
+                    if statement:
+                        cursor.execute(statement)
 
     def health_check(self) -> dict[str, Any]:
         if psycopg is None:

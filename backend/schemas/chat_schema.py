@@ -1,6 +1,6 @@
 """Schemas for the chat API."""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ChatRequest(BaseModel):
@@ -10,8 +10,7 @@ class ChatRequest(BaseModel):
     conversation_id: str
     user_input: str
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class ChatResponse(BaseModel):

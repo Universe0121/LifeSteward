@@ -101,6 +101,10 @@ class QwenProviderTest(unittest.TestCase):
             model_name="qwen-plus",
             base_url="https://dashscope.aliyuncs.com/compatible-mode/v1",
             temperature=0.7,
+            timeout=30.0,
+            max_retries=3,
+            retry_backoff=0.2,
+            embedding_model_name="text-embedding-v3",
         )
 
     @patch.dict(

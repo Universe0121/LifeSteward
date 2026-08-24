@@ -105,6 +105,7 @@ class SQLTool:
             ON CONFLICT (user_id) DO UPDATE SET
                 profile_data = EXCLUDED.profile_data,
                 updated_at = NOW()
+            RETURNING user_id
             """,
             (normalized_user_id, json.dumps(profile_data, ensure_ascii=False)),
         )

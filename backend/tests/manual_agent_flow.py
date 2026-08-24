@@ -1,4 +1,4 @@
-"""Manual acceptance script for the real core Agent workflow.
+"""Manual acceptance script for the real Day2 Agent workflow.
 
 Run from the backend directory:
     python tests/manual_agent_flow.py
@@ -29,12 +29,17 @@ except ImportError:  # pragma: no cover - depends on local developer setup.
 from agents.master_agent import MasterAgent
 from agents.state import AgentState
 from core.llm_service import configure_llm_service_from_environment
+from services.memory_service import InMemoryMemoryService
 
 
-ACCEPTANCE_USER_INPUT = "今天学习数学2小时，很累，昨晚睡了6小时"
+ACCEPTANCE_CASES = (
+    ("record_event", "今天学习数学2小时，很累"),
+    ("reflection", "最近为什么学习效率越来越低？"),
+    ("query_memory", "我以前压力大的时候有什么有效的调整办法？"),
+)
 
 
-def create_acceptance_state(user_input: str = ACCEPTANCE_USER_INPUT) -> AgentState:
+def create_acceptance_state(user_input: str) -> AgentState:
     return {
         "user_id": "550e8400-e29b-41d4-a716-446655440000",
         "conversation_id": "conv_real_001",
@@ -59,16 +64,20 @@ def summarize_result(result: AgentState) -> dict[str, Any]:
     return {
         "intent": result["intent"],
         "event_count": len(result["extracted_events"]),
+        "memory_count": len(result["retrieved_memories"]),
         "extracted_events": result["extracted_events"],
+        "retrieved_memories": result["retrieved_memories"],
         "assistant_response": result["assistant_response"],
     }
 
 
-def assert_acceptance_result(result: AgentState) -> None:
-    if result["intent"] != "record_event":
-        raise AssertionError(f"Expected intent record_event, got {result['intent']!r}")
+def assert_acceptance_result(expected_intent: str, result: AgentState) -> None:
+    if result["intent"] != expected_intent:
+        raise AssertionError(
+            f"Expected intent {expected_intent}, got {result['intent']!r}"
+        )
 
-    if not result["extracted_events"]:
+    if expected_intent == "record_event" and not result["extracted_events"]:
         raise AssertionError("Expected at least one extracted life event")
 
     for index, event in enumerate(result["extracted_events"], start=1):
@@ -81,23 +90,41 @@ def assert_acceptance_result(result: AgentState) -> None:
         raise AssertionError("Expected a non-empty assistant_response")
 
 
-def run_acceptance() -> AgentState:
-    load_environment()
-    llm_service = configure_llm_service_from_environment()
-    return MasterAgent(llm_service=llm_service).process(create_acceptance_state())
+def run_acceptance_case(
+    master_agent: MasterAgent,
+    user_input: str,
+    intent: str,
+) -> AgentState:
+    return master_agent.process(create_acceptance_state(user_input))
 
 
 def main() -> int:
     try:
-        result = run_acceptance()
-        assert_acceptance_result(result)
+        load_environment()
+        llm_service = configure_llm_service_from_environment()
+        memory_service = InMemoryMemoryService()
+        master_agent = MasterAgent(
+            llm_service=llm_service,
+            memory_service=memory_service,
+        )
+
+        results = []
+        for expected_intent, user_input in ACCEPTANCE_CASES:
+            result = run_acceptance_case(master_agent, user_input, expected_intent)
+            assert_acceptance_result(expected_intent, result)
+            results.append(
+                {
+                    "user_input": user_input,
+                    **summarize_result(result),
+                }
+            )
     except Exception as exc:
-        print("[FAIL] real model core Agent acceptance failed")
+        print("[FAIL] real model Day2 Agent acceptance failed")
         print(f"{type(exc).__name__}: {exc}")
         return 1
 
-    print("[PASS] real model core Agent acceptance passed")
-    print(json.dumps(summarize_result(result), ensure_ascii=False, indent=2))
+    print("[PASS] real model Day2 Agent acceptance passed")
+    print(json.dumps(results, ensure_ascii=False, indent=2))
     return 0
 
 

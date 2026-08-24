@@ -232,3 +232,12 @@ assistant_response
 Branch：尚未建立 Git 仓库。
 
 Commit：提交。
+## Day2 真实模型闭环验收补充（2026-08-22）
+
+- `py -3.12 -m unittest discover -s tests -v`：37 个测试通过，2 个基础设施检查因未配置 PostgreSQL/Redis 连接串而跳过。
+- `tests/manual_agent_flow.py`：真实模型 Day2 三场景验收通过。
+  - 学习记录场景识别为 `record_event`，成功抽取事件并生成回复。
+  - 学习效率场景识别为 `reflection`，成功检索历史事件并生成反思回复。
+  - 压力调整场景识别为 `query_memory`，成功检索并生成无匹配记忆时的解释回复。
+- `QwenProvider` 已支持 timeout、max_retries、retry_backoff 及统一异常类型；retry 单元测试通过。
+- 当前真实 MemoryService 仍为 Mock/Fake；PostgreSQL/pgvector 持久化和真实 ChatService/MemoryService 联调仍待后续完成。
