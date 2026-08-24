@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
 import json
+from datetime import UTC, datetime, timedelta
 from collections.abc import Iterable
 from typing import Any
 
@@ -92,22 +92,31 @@ class SQLTool:
                 inserted_count += 1
         return inserted_count
 
-    def update_user_profile(self, user_id: str, profile_data: dict[str, Any]) -> None:
+    def update_user_profile(self, user_id: str, user_profile: dict[str, Any]) -> None:
         normalized_user_id = str(user_id).strip()
         if not normalized_user_id:
             raise ValueError("user_id is required")
-        if not isinstance(profile_data, dict):
-            raise ValueError("profile_data must be a dictionary")
-        self._database_client.fetch_one(
+        if not isinstance(user_profile, dict):
+            raise ValueError("user_profile must be a dict")
+
+        self._database_client.execute(
             """
-            INSERT INTO user_profile (user_id, profile_data, updated_at)
-            VALUES (%s, %s::jsonb, NOW())
-            ON CONFLICT (user_id) DO UPDATE SET
+            INSERT INTO user_profile (
+                user_id,
+                profile_data,
+                updated_at
+            ) VALUES (
+                %s, %s::jsonb, NOW()
+            )
+            ON CONFLICT (user_id)
+            DO UPDATE SET
                 profile_data = EXCLUDED.profile_data,
                 updated_at = NOW()
-            RETURNING user_id
             """,
-            (normalized_user_id, json.dumps(profile_data, ensure_ascii=False)),
+            (
+                normalized_user_id,
+                json.dumps(user_profile, ensure_ascii=False),
+            ),
         )
 
     @staticmethod

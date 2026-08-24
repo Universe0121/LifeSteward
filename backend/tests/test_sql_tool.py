@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import unittest
 import json
+import unittest
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -17,6 +17,7 @@ class FakeDatabaseClient:
     fetch_one_result: dict[str, Any] | None = None
     fetch_all_calls: list[tuple[str, tuple[Any, ...]]] = field(default_factory=list)
     fetch_one_calls: list[tuple[str, tuple[Any, ...]]] = field(default_factory=list)
+    execute_calls: list[tuple[str, tuple[Any, ...]]] = field(default_factory=list)
 
     def fetch_all(
         self,
@@ -33,6 +34,13 @@ class FakeDatabaseClient:
     ) -> dict[str, Any] | None:
         self.fetch_one_calls.append((query, tuple(params or ())))
         return self.fetch_one_result
+
+    def execute(
+        self,
+        query: str,
+        params: tuple[Any, ...] | list[Any] | None = None,
+    ) -> None:
+        self.execute_calls.append((query, tuple(params or ())))
 
 
 class SQLToolTestCase(unittest.TestCase):
@@ -97,26 +105,61 @@ class SQLToolTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             tool.save_life_events([{ "user_id": "10001" }])
 
-    def test_update_user_profile_upserts_json_profile(self) -> None:
-        client = FakeDatabaseClient(fetch_one_result={"user_id": "10001"})
+    def test_update_user_profile_creates_profile_with_jsonb_upsert(self) -> None:
+        client = FakeDatabaseClient()
         tool = SQLTool(database_client=client)
 
-        tool.update_user_profile("10001", {"sleep_target_hours": 8, "tags": ["study"]})
+        user_profile = {"learning_style": "short_task", "sleep_habit": "late_sleep"}
+        tool.update_user_profile("10001", user_profile)
 
-        query, params = client.fetch_one_calls[0]
+        self.assertEqual(len(client.execute_calls), 1)
+        query, params = client.execute_calls[0]
         self.assertIn("INSERT INTO user_profile", query)
         self.assertIn("ON CONFLICT (user_id)", query)
-        self.assertIn("RETURNING user_id", query)
         self.assertEqual(params[0], "10001")
-        self.assertEqual(json.loads(params[1]), {"sleep_target_hours": 8, "tags": ["study"]})
+        self.assertEqual(json.loads(params[1]), user_profile)
 
-    def test_update_user_profile_validates_arguments(self) -> None:
-        tool = SQLTool(database_client=FakeDatabaseClient())
+    def test_update_user_profile_updates_existing_user(self) -> None:
+        client = FakeDatabaseClient()
+        tool = SQLTool(database_client=client)
 
-        with self.assertRaises(ValueError):
-            tool.update_user_profile("", {})
-        with self.assertRaises(ValueError):
-            tool.update_user_profile("10001", [])
+        tool.update_user_profile("10001", {"learning_style": "short_task"})
+        tool.update_user_profile("10001", {"learning_style": "deep_work"})
+
+        self.assertEqual(len(client.execute_calls), 2)
+        self.assertEqual(client.execute_calls[1][1][0], "10001")
+        self.assertEqual(
+            json.loads(client.execute_calls[1][1][1]),
+            {"learning_style": "deep_work"},
+        )
+
+    def test_update_user_profile_keeps_users_isolated(self) -> None:
+        client = FakeDatabaseClient()
+        tool = SQLTool(database_client=client)
+
+        tool.update_user_profile("10001", {"learning_style": "short_task"})
+        tool.update_user_profile("10002", {"learning_style": "deep_work"})
+
+        self.assertEqual(client.execute_calls[0][1][0], "10001")
+        self.assertEqual(client.execute_calls[1][1][0], "10002")
+
+    def test_update_user_profile_accepts_empty_profile(self) -> None:
+        client = FakeDatabaseClient()
+        tool = SQLTool(database_client=client)
+
+        tool.update_user_profile("10001", {})
+
+        self.assertEqual(json.loads(client.execute_calls[0][1][1]), {})
+
+    def test_update_user_profile_database_error_is_visible_to_caller(self) -> None:
+        class BrokenDatabaseClient(FakeDatabaseClient):
+            def execute(self, query, params=None):
+                raise RuntimeError("profile upsert failed")
+
+        tool = SQLTool(database_client=BrokenDatabaseClient())
+
+        with self.assertRaisesRegex(RuntimeError, "profile upsert failed"):
+            tool.update_user_profile("10001", {"learning_style": "short_task"})
 
     def test_database_error_is_visible_to_caller(self) -> None:
         class BrokenDatabaseClient(FakeDatabaseClient):
