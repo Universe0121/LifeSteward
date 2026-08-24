@@ -144,6 +144,6 @@ PostgreSQL / pgvector `memories`
 
 Branch：feature_day4_db_integration
 
-Commit：54dc034 fix(tool): add user profile persistence
+Commit：6b9e924 fix(tool): add user profile persistence
 
 测试记录：`python -m unittest discover -s tests -p "test_*.py" -v`，结果 `Ran 67 tests ... OK (skipped=7)`；跳过项为未配置 `POSTGRES_DSN` / `REDIS_URL` 的环境测试。
