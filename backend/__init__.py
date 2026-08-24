@@ -1,0 +1,1 @@
+"""LifeAgent backend package."""

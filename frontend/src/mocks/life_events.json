@@ -1,0 +1,23 @@
+[
+  {
+    "event_type": "study",
+    "event_content": "完成10道 C++ 题目",
+    "event_time": "2026-08-21 09:00",
+    "emotion": "focused",
+    "importance_score": 0.8
+  },
+  {
+    "event_type": "exercise",
+    "event_content": "操场慢跑 30 分钟",
+    "event_time": "2026-08-21 18:30",
+    "emotion": "relaxed",
+    "importance_score": 0.5
+  },
+  {
+    "event_type": "sleep",
+    "event_content": "昨晚睡眠 7 小时",
+    "event_time": "2026-08-22 07:30",
+    "emotion": "refreshed",
+    "importance_score": 0.6
+  }
+]

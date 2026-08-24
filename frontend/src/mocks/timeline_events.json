@@ -1,0 +1,66 @@
+{
+  "2026-08-21": [
+    {
+      "event_type": "study",
+      "event_content": "完成10道 C++ 题目",
+      "event_time": "09:00",
+      "emotion": "focused",
+      "importance_score": 0.8
+    },
+    {
+      "event_type": "exercise",
+      "event_content": "操场慢跑 30 分钟",
+      "event_time": "18:30",
+      "emotion": "relaxed",
+      "importance_score": 0.5
+    }
+  ],
+  "2026-08-22": [
+    {
+      "event_type": "sleep",
+      "event_content": "昨晚睡眠 7 小时",
+      "event_time": "07:30",
+      "emotion": "refreshed",
+      "importance_score": 0.6
+    },
+    {
+      "event_type": "study",
+      "event_content": "整理线性代数笔记",
+      "event_time": "14:00",
+      "emotion": "calm",
+      "importance_score": 0.7
+    }
+  ],
+  "2026-08-23": [
+    {
+      "event_type": "study",
+      "event_content": "完成英语听力训练",
+      "event_time": "10:15",
+      "emotion": "focused",
+      "importance_score": 0.6
+    },
+    {
+      "event_type": "exercise",
+      "event_content": "拉伸和散步 45 分钟",
+      "event_time": "19:00",
+      "emotion": "relaxed",
+      "importance_score": 0.4
+    }
+  ],
+  "2026-08-24": [
+    {
+      "event_type": "study",
+      "event_content": "完成项目架构梳理",
+      "event_time": "09:30",
+      "emotion": "motivated",
+      "importance_score": 0.9
+    },
+    {
+      "event_type": "sleep",
+      "event_content": "昨晚睡眠 6.5 小时",
+      "event_time": "08:00",
+      "emotion": "tired",
+      "importance_score": 0.6
+    }
+  ]
+}
