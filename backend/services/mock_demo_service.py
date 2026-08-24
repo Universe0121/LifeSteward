@@ -88,7 +88,7 @@ class DemoLLM:
                 value = nums.group(1) if nums else None
                 value = {"一":"1","两":"2","二":"2","三":"3","四":"4","五":"5","六":"6","七":"7","八":"8","九":"9","十":"10"}.get(value, value)
                 add("sleep", m.group(0), m.group(0), duration=value, duration_unit="hour")
-            for m in re.finditer(r"(学习[^，。；;]*?(?:\d+|[一二两三四五六七八九十]+)小时|写了?[^，。；;]*?代码)", text):
+            for m in re.finditer(r"([^，。；;]*?学习[^，。；;]*?(?:\d+|[一二两三四五六七八九十]+)小时|写了?[^，。；;]*?代码)", text):
                 nums = re.search(r"(\d+|[一二两三四五六七八九十]+)个?小时", m.group(0))
                 value = nums.group(1) if nums else None
                 value = {"一":"1","两":"2","二":"2","三":"3","四":"4","五":"5","六":"6","七":"7","八":"8","九":"9","十":"10"}.get(value, value)
