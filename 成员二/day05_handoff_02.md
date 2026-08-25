@@ -156,7 +156,7 @@ python tests\manual_day5_demo_flow.py
 
 Branch：feature_day5_demo_db_loop
 
-Commit：待提交
+Commit：5476670 test(db): verify real demo persistence roundtrip
 
 测试记录：
 
