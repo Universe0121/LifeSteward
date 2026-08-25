@@ -1,6 +1,7 @@
 """Application settings loaded from environment variables."""
 
 from dataclasses import dataclass
+from pathlib import Path
 import os
 
 try:  # pragma: no cover - optional dependency branch
@@ -10,7 +11,7 @@ except ImportError:  # pragma: no cover - handled at runtime
         return False
 
 from core.providers.qwen_provider import DASHSCOPE_COMPATIBLE_BASE_URL
-
+_ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
 
 @dataclass(frozen=True)
 class AppSettings:
@@ -28,7 +29,7 @@ class AppSettings:
 def load_settings() -> AppSettings:
     """Load the current process configuration from environment variables."""
 
-    load_dotenv(override=False)
+    load_dotenv(dotenv_path=_ENV_PATH, override=False)
 
     return AppSettings(
         postgres_dsn=os.getenv("POSTGRES_DSN", "").strip(),
