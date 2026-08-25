@@ -21,6 +21,9 @@ const apiSource = await read("src/api.ts");
 for (const field of ["user_id", "conversation_id", "user_input", "assistant_response", "extracted_events"]) {
   assert.match(apiSource, new RegExp(field));
 }
+for (const contract of ["getLifeEvents", "/v1/life-events", "LifeEventsResponse", "created_at"]) {
+  assert.match(apiSource, new RegExp(contract));
+}
 
 const appSource = await read("src/App.tsx");
 for (const label of ["首页", "聊天", "日历", "画像", "定制"]) {
@@ -28,9 +31,10 @@ for (const label of ["首页", "聊天", "日历", "画像", "定制"]) {
 }
 
 const timelineSource = await read("src/pages/Timeline.tsx");
-for (const interaction of ["selected_date", "event_filter", "expanded_id", "timeline_events"]) {
+for (const interaction of ["selected_date", "event_filter", "expanded_id", "getLifeEvents", "loading", "reload_token"]) {
   assert.match(timelineSource, new RegExp(interaction));
 }
+assert.doesNotMatch(timelineSource, /mocks\/timeline_events/);
 
 const customizeSource = await read("src/pages/Customize.tsx");
 for (const interaction of ["localStorage", "addTask", "project_name", "project_description"]) {

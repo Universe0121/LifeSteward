@@ -17,7 +17,14 @@ def _coerce_datetime(value: Any) -> datetime | None:
         return value if value.tzinfo else value.replace(tzinfo=UTC)
     if isinstance(value, str):
         normalized = value.strip().replace("Z", "+00:00")
-        parsed = datetime.fromisoformat(normalized)
+        if not normalized:
+            return None
+        try:
+            parsed = datetime.fromisoformat(normalized)
+        except ValueError:
+            # LLM extraction can return relative phrases such as "昨晚".
+            # Preserve the event and let created_at provide timeline ordering.
+            return None
         return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
     raise ValueError("event_time must be a datetime or ISO-8601 string")
 

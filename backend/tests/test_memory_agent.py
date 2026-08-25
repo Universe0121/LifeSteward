@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from agents.memory_agent import MemoryAgent
+from agents.memory_agent import MemoryAgent, MemoryPersistenceError
 from agents.state import AgentState
 from services.memory_service import InMemoryMemoryService, MemoryService
 
@@ -114,6 +114,13 @@ class MemoryAgentTest(unittest.TestCase):
         result = MemoryAgent(FailingMemoryService()).process(state)
 
         self.assertEqual(result["retrieved_memories"], [])
+
+    def test_record_event_persistence_error_is_not_swallowed(self) -> None:
+        state = create_state("record_event")
+        state["extracted_events"] = [{"event_content": "study"}]
+
+        with self.assertRaisesRegex(MemoryPersistenceError, "persist"):
+            MemoryAgent(FailingMemoryService()).process(state)
 
 
 if __name__ == "__main__":

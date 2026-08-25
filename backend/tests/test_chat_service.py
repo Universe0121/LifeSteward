@@ -7,6 +7,9 @@ from dataclasses import dataclass
 
 from pydantic import ValidationError
 
+from agents.master_agent import MasterAgent
+from agents.memory_agent import MemoryPersistenceError
+from services.memory_service import MemoryService
 from schemas.chat_schema import ChatRequest, ChatResponse
 from services.chat_service import (
     AgentProcessingError,
@@ -89,6 +92,58 @@ class ChatServiceTestCase(unittest.TestCase):
 
         with self.assertRaises(AgentProcessingError):
             process_chat_message(self.chat_request, master_agent=BrokenMasterAgent())
+
+    def test_persistence_error_reaches_api_boundary_without_success_text(self) -> None:
+        class RecordEventLLM:
+            def generate(self, prompt, variables):
+                return '{"intent":"record_event"}'
+
+        class ExtractedEventAgent:
+            def process(self, state):
+                state["extracted_events"] = [{"event_content": "study"}]
+                return state
+
+        class FailingMemoryService(MemoryService):
+            def save_memory(self, user_id, events):
+                raise RuntimeError("database unavailable")
+
+            def search_memory(self, user_id, memory_query, top_k=5):
+                return []
+
+            def update_user_profile(self, user_id, user_profile):
+                return None
+
+            def compress_memory(self, events):
+                return []
+
+        class SuccessReplyMustNotRun:
+            called = False
+
+            def process(self, state):
+                self.called = True
+                state["assistant_response"] = "recorded successfully"
+                return state
+
+        interaction_agent = SuccessReplyMustNotRun()
+        master_agent = MasterAgent(
+            memory_service=FailingMemoryService(),
+            life_understanding_agent=ExtractedEventAgent(),
+            interaction_agent=interaction_agent,
+            llm_service=RecordEventLLM(),
+        )
+
+        with self.assertRaisesRegex(AgentProcessingError, "persist") as caught:
+            process_chat_message(self.chat_request, master_agent=master_agent)
+
+        self.assertEqual(str(caught.exception), "Unable to persist recorded events")
+        self.assertNotIn("success", str(caught.exception).lower())
+        self.assertIsInstance(caught.exception.__cause__, MemoryPersistenceError)
+        self.assertIsInstance(caught.exception.__cause__.__cause__, RuntimeError)
+        self.assertEqual(
+            str(caught.exception.__cause__.__cause__),
+            "database unavailable",
+        )
+        self.assertFalse(interaction_agent.called)
 
     def test_chat_response_has_only_public_contract_fields(self) -> None:
         chat_response = ChatResponse(

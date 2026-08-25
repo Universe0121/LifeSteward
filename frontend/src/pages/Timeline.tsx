@@ -1,28 +1,85 @@
-import { useMemo, useState } from "react";
-import timeline_events from "../mocks/timeline_events.json";
+import { useEffect, useMemo, useState } from "react";
 
-type LifeEvent = { event_type: string; event_content: string; event_time: string; emotion: string; importance_score: number };
+import { getLifeEvents, type LifeEvent } from "../api";
+
 type EventFilter = "all" | "study" | "exercise" | "sleep";
+
+const current_user_id = 10001;
+const query_days = 7;
 const event_labels: Record<string, string> = { study: "学习", exercise: "运动", sleep: "作息" };
-const date_options = Object.keys(timeline_events);
+
+function dateKey(value: string): string {
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function recentDates(days: number): string[] {
+  const dates: string[] = [];
+  const today = new Date();
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - offset);
+    dates.push(dateKey(date.toISOString()));
+  }
+  return dates;
+}
+
+function eventDate(event: LifeEvent): string {
+  return dateKey(event.event_time ?? event.created_at);
+}
+
+function eventTime(event: LifeEvent): string {
+  return new Date(event.event_time ?? event.created_at).toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 export default function Timeline() {
-  const [selected_date, setSelectedDate] = useState("2026-08-24");
+  const date_options = useMemo(() => recentDates(query_days), []);
+  const [selected_date, setSelectedDate] = useState(date_options[date_options.length - 1] ?? "");
   const [event_filter, setEventFilter] = useState<EventFilter>("all");
-  const [expanded_id, setExpandedId] = useState<string | null>(null);
-  const day_events = timeline_events[selected_date as keyof typeof timeline_events] as LifeEvent[];
-  const filtered_events = useMemo(() => event_filter === "all" ? day_events : day_events.filter((event) => event.event_type === event_filter), [day_events, event_filter]);
+  const [expanded_id, setExpandedId] = useState<number | null>(null);
+  const [life_events, setLifeEvents] = useState<LifeEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [reload_token, setReloadToken] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError("");
+    getLifeEvents(current_user_id, query_days)
+      .then((response) => { if (!cancelled) setLifeEvents(response.items); })
+      .catch(() => { if (!cancelled) setError("时间轴加载失败，请稍后重试。"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [reload_token]);
+
+  const day_events = useMemo(
+    () => life_events.filter((event) => eventDate(event) === selected_date),
+    [life_events, selected_date],
+  );
+  const filtered_events = useMemo(
+    () => event_filter === "all" ? day_events : day_events.filter((event) => event.event_type === event_filter),
+    [day_events, event_filter],
+  );
   const selected_label = selected_date.slice(5).replace("-", "月") + "日";
 
   return (
     <section className="content-page">
-      <header className="page-heading"><div><span className="eyebrow">2026年{selected_label}</span><h1>个人时间轴</h1></div><button className="profile-chip reset-date" onClick={() => setSelectedDate("2026-08-24")} aria-label="回到今天">●</button></header>
-      <div className="date-strip" aria-label="日期选择">{date_options.map((date) => { const day = date.slice(-2); return <button className={date === selected_date ? "selected-date" : "date-button"} key={date} onClick={() => { setSelectedDate(date); setExpandedId(null); }}>{day}</button>; })}</div>
-      <div className="filter-row">{([["all", "全部"], ["study", "学习"], ["exercise", "运动"], ["sleep", "作息"]] as const).map(([value, label]) => <button className={event_filter === value ? "filter-button active" : "filter-button"} key={value} onClick={() => setEventFilter(value)}>{label}</button>)}</div>
+      <header className="page-heading"><div><span className="eyebrow">{selected_date.slice(0, 4)}年{selected_label}</span><h1>个人时间轴</h1></div><button className="profile-chip reset-date" onClick={() => setSelectedDate(date_options[date_options.length - 1] ?? "")} aria-label="回到今天">●</button></header>
+      <div className="date-strip" aria-label="日期选择">{date_options.map((date) => <button className={date === selected_date ? "selected-date" : "date-button"} key={date} onClick={() => { setSelectedDate(date); setExpandedId(null); }}>{date.slice(-2)}</button>)}</div>
+      <div className="filter-row">{([['all', '全部'], ['study', '学习'], ['exercise', '运动'], ['sleep', '作息']] as const).map(([value, label]) => <button className={event_filter === value ? "filter-button active" : "filter-button"} key={value} onClick={() => setEventFilter(value)}>{label}</button>)}</div>
       <div className="section-title"><h2>生活记录</h2><span className="eyebrow">{filtered_events.length} 条记录</span></div>
       <div className="timeline-list">
-        {filtered_events.length === 0 && <div className="empty-state">这一天还没有该类型的记录。</div>}
-        {filtered_events.map((event, index) => { const event_id = `${selected_date}-${event.event_time}-${index}`; const is_expanded = expanded_id === event_id; return <article className={`timeline-card ${index === 0 ? "featured" : ""} ${is_expanded ? "expanded" : ""}`} key={event_id} onClick={() => setExpandedId(is_expanded ? null : event_id)}><span className="timeline-node" /><div className="timeline-copy"><span className="event-type">{event_labels[event.event_type] ?? event.event_type}</span><h3>{event.event_content}</h3><p>{event.event_time} · {event.emotion}</p>{is_expanded && <div className="event-detail">重要程度 {(event.importance_score * 100).toFixed(0)}%<br />来源：life_events</div>}</div><span className="importance">{is_expanded ? "收起" : event.importance_score.toFixed(1)}</span></article>; })}
+        {loading && <div className="empty-state">正在加载生活记录…</div>}
+        {!loading && error && <div className="empty-state">{error}<br /><button onClick={() => setReloadToken((value) => value + 1)}>重新加载</button></div>}
+        {!loading && !error && filtered_events.length === 0 && <div className="empty-state">这一天还没有该类型的记录。</div>}
+        {!loading && !error && filtered_events.map((event, index) => { const is_expanded = expanded_id === event.life_event_id; return <article className={`timeline-card ${index === 0 ? "featured" : ""} ${is_expanded ? "expanded" : ""}`} key={event.life_event_id} onClick={() => setExpandedId(is_expanded ? null : event.life_event_id)}><span className="timeline-node" /><div className="timeline-copy"><span className="event-type">{event_labels[event.event_type] ?? event.event_type}</span><h3>{event.event_content}</h3><p>{eventTime(event)} · {event.emotion || "未记录情绪"}</p>{is_expanded && <div className="event-detail">重要程度 {(event.importance_score * 100).toFixed(0)}%<br />来源：{event.source || "life_events"}</div>}</div><span className="importance">{is_expanded ? "收起" : event.importance_score.toFixed(1)}</span></article>; })}
       </div>
     </section>
   );

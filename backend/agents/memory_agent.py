@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
+import logging
+
 from agents.intent import Intent
 from agents.state import AgentState
 from services.memory_service import MemoryService
+
+logger = logging.getLogger(__name__)
+
+
+class MemoryPersistenceError(RuntimeError):
+    """Raised when a record_event cannot be persisted."""
 
 
 class MemoryAgent:
@@ -26,7 +34,12 @@ class MemoryAgent:
         try:
             if intent == Intent.RECORD_EVENT.value:
                 if extracted_events:
-                    self.memory_service.save_memory(user_id, extracted_events)
+                    try:
+                        self.memory_service.save_memory(user_id, extracted_events)
+                    except Exception as exc:
+                        raise MemoryPersistenceError(
+                            "Failed to persist recorded events"
+                        ) from exc
                 return state
 
             if self._should_retrieve(intent):
@@ -40,7 +53,14 @@ class MemoryAgent:
                     memory_query,
                     top_k=5,
                 )
+        except MemoryPersistenceError:
+            raise
         except Exception:
+            logger.warning(
+                "Memory retrieval degraded for intent=%s",
+                intent,
+                exc_info=True,
+            )
             state["retrieved_memories"] = []
 
         return state

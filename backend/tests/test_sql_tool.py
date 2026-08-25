@@ -105,6 +105,23 @@ class SQLToolTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             tool.save_life_events([{ "user_id": "10001" }])
 
+    def test_save_life_events_tolerates_relative_event_time(self) -> None:
+        client = FakeDatabaseClient(fetch_one_result={"id": 1})
+        tool = SQLTool(database_client=client)
+
+        inserted = tool.save_life_events(
+            [
+                {
+                    "user_id": "10001",
+                    "event_content": "昨晚睡了6小时",
+                    "event_time": "昨晚",
+                }
+            ]
+        )
+
+        self.assertEqual(inserted, 1)
+        self.assertIsNone(client.fetch_one_calls[0][1][4])
+
     def test_update_user_profile_creates_profile_with_jsonb_upsert(self) -> None:
         client = FakeDatabaseClient()
         tool = SQLTool(database_client=client)

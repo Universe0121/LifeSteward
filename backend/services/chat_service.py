@@ -3,6 +3,7 @@
 from copy import deepcopy
 
 from agents.master_agent import MasterAgent
+from agents.memory_agent import MemoryPersistenceError
 from agents.state import AgentState
 from schemas.chat_schema import ChatRequest, ChatResponse
 
@@ -56,5 +57,7 @@ def process_chat_message(
             intent=result_state.get("intent", ""),
             extracted_events=result_state.get("extracted_events", []),
         )
+    except MemoryPersistenceError as exc:
+        raise AgentProcessingError("Unable to persist recorded events") from exc
     except Exception as exc:
         raise AgentProcessingError("Failed to process chat message") from exc

@@ -1,13 +1,15 @@
 """FastAPI application entry point for the LifeAgent backend."""
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Query, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 
 from schemas.chat_schema import ChatRequest, ChatResponse
 from schemas.error_schema import ErrorResponse
+from schemas.life_event_schema import LifeEventItem, LifeEventsResponse
 from services.chat_service import AgentProcessingError, process_chat_message
+from services.life_event_query_service import LifeEventQueryService
 from services.mock_demo_service import get_demo_agent
 from core.composition_root import CompositionRoot, build_composition_root
 
@@ -47,6 +49,23 @@ def chat(chat_request: ChatRequest) -> ChatResponse:
 def mock_chat(chat_request: ChatRequest) -> ChatResponse:
     """Run the same service/agent chain with a deterministic local model."""
     return process_chat_message(chat_request, master_agent=get_demo_agent())
+
+
+@app.get("/api/v1/life-events", response_model=LifeEventsResponse)
+def life_events(
+    user_id: str = Query(..., min_length=1),
+    days: int = Query(7, ge=1, le=30),
+) -> LifeEventsResponse:
+    """Return recent persisted life events through the shared SQL tool."""
+
+    root: CompositionRoot | None = getattr(app.state, "composition_root", None)
+    if root is None:
+        raise RuntimeError("Production composition root is not initialized")
+    items = LifeEventQueryService(root.sql_tool).get_recent_events(user_id, days)
+    return LifeEventsResponse(
+        items=[LifeEventItem.model_validate(item) for item in items],
+        count=len(items),
+    )
 
 
 def _error_response(
