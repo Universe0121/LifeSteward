@@ -59,6 +59,34 @@ class MasterAgentRoutingTest(unittest.TestCase):
         self.assertEqual(len(memory.save_calls), 1)
         self.assertEqual(len(llm.calls), 2)
 
+    def test_planning_routes_memory_then_planning_then_interaction(self) -> None:
+        llm = QueueLLMService(
+            [
+                json.dumps(
+                    [
+                        {
+                            "task_name": "复习数学",
+                            "start_time": "09:00",
+                            "duration_minutes": 60,
+                            "difficulty": 0.5,
+                        }
+                    ]
+                ),
+                "收到。",
+            ]
+        )
+        memory = InMemoryMemoryService([{"event_content": "学习历史信息"}])
+
+        result = MasterAgent(
+            llm_service=llm,
+            memory_service=memory,
+        ).process(create_state("planning", "根据学习历史制定计划"))
+
+        self.assertEqual(result["assistant_response"], "收到。")
+        self.assertEqual(len(result["retrieved_memories"]), 1)
+        self.assertEqual(result["generated_plan"][0]["task_name"], "复习数学")
+        self.assertEqual(len(llm.calls), 2)
+
     def test_query_memory_routes_memory_then_interaction(self) -> None:
         llm = QueueLLMService(["找到一条历史记录。"])
         memory = InMemoryMemoryService([{"event_content": "压力大时过去有效的调整办法"}])
@@ -90,15 +118,6 @@ class MasterAgentRoutingTest(unittest.TestCase):
         self.assertEqual(result["reflection_result"]["status"], "high_pressure")
         self.assertEqual(result["assistant_response"], "建议先恢复睡眠。")
         self.assertEqual(len(llm.calls), 2)
-
-    def test_planning_keeps_memory_then_interaction_route(self) -> None:
-        llm = QueueLLMService(["收到。"])
-        memory = InMemoryMemoryService([{"event_content": "学习历史信息"}])
-        result = MasterAgent(llm_service=llm, memory_service=memory).process(
-            create_state("planning", "根据学习历史制定计划")
-        )
-        self.assertEqual(result["assistant_response"], "收到。")
-        self.assertEqual(len(result["retrieved_memories"]), 1)
 
     def test_casual_chat_does_not_call_memory_service(self) -> None:
         llm = QueueLLMService(["你好。"])
