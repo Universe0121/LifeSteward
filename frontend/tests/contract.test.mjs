@@ -29,6 +29,8 @@ const appSource = await read("src/App.tsx");
 for (const label of ["首页", "聊天", "日历", "画像", "定制"]) {
   assert.match(appSource, new RegExp(label));
 }
+assert.match(appSource, /voice-nav/);
+assert.match(appSource, /快捷记录/);
 
 const timelineSource = await read("src/pages/Timeline.tsx");
 for (const interaction of ["selected_date", "event_filter", "expanded_id", "getLifeEvents", "loading", "reload_token"]) {
@@ -39,6 +41,23 @@ assert.doesNotMatch(timelineSource, /mocks\/timeline_events/);
 const customizeSource = await read("src/pages/Customize.tsx");
 for (const interaction of ["localStorage", "addTask", "project_name", "project_description"]) {
   assert.match(customizeSource, new RegExp(interaction));
+}
+
+const workspaceSource = await read("src/workspace.tsx");
+for (const interaction of ["WorkspaceProvider", "useWorkspace", "toggleTheme", "resetWorkspace"]) {
+  assert.match(workspaceSource, new RegExp(interaction));
+}
+
+for (const interaction of ["搜索任务", "今日完成率", "连续记录", "快捷记录"]) {
+  assert.match(await read("src/pages/Home.tsx"), new RegExp(interaction));
+}
+
+for (const interaction of ["新增记录", "上一天", "下一天", "event_form"]) {
+  assert.match(timelineSource, new RegExp(interaction));
+}
+
+for (const interaction of ["快捷提问", "清空对话", "is_loading"]) {
+  assert.match(await read("src/pages/ChatHome.tsx"), new RegExp(interaction));
 }
 
 console.log("frontend contract passed");
