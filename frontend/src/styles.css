@@ -45,6 +45,11 @@ button { cursor: pointer; }
 .chat-intro { margin: 14px 24px 26px; padding: 28px 24px; border-radius: 28px; color: white; background: var(--dark); }
 .chat-intro h2 { margin: 10px 0 8px; font-size: 29px; }
 .chat-intro p:last-child { margin: 0; color: #d1d1d1; line-height: 1.7; }
+.quick-prompt-heading { display: flex; align-items: center; justify-content: space-between; margin: 0 24px 12px; }
+.text-button { border: 0; color: var(--muted); background: transparent; font-size: 12px; }
+.quick-prompts { display: flex; gap: 8px; overflow-x: auto; padding: 0 24px 18px; scrollbar-width: none; }
+.quick-prompts::-webkit-scrollbar { display: none; }
+.quick-prompts button { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 14px; color: var(--ink); background: white; white-space: nowrap; }
 .message-list { display: grid; gap: 18px; padding: 0 24px; }
 .message { display: flex; align-items: flex-start; gap: 10px; max-width: 92%; }
 .message.user { justify-self: end; flex-direction: row-reverse; }
@@ -52,15 +57,34 @@ button { cursor: pointer; }
 .message.user .message-avatar { color: white; background: var(--dark); }
 .message-bubble { padding: 13px 15px; border-radius: 5px 18px 18px 18px; background: white; color: #4d4d4d; line-height: 1.6; box-shadow: 0 4px 16px rgba(36, 36, 36, 0.03); }
 .message.user .message-bubble { border-radius: 18px 5px 18px 18px; color: white; background: var(--dark); }
+.message small { display: block; margin: 5px 3px 0; color: var(--muted); font-size: 9px; }
+.typing-indicator { display: flex; gap: 4px; padding: 17px; }
+.typing-indicator i { width: 5px; height: 5px; border-radius: 50%; background: var(--blue-strong); animation: typing 1s infinite alternate; }
+.typing-indicator i:nth-child(2) { animation-delay: .2s; }
+.typing-indicator i:nth-child(3) { animation-delay: .4s; }
+@keyframes typing { to { opacity: .25; transform: translateY(-3px); } }
+.request-error { display: grid; gap: 7px; margin: 16px 24px; padding: 14px 16px; border: 1px solid #e8b5b5; border-radius: 16px; color: #8c3131; background: #fff4f4; font-size: 12px; }
+.request-error button, .empty-state button { justify-self: center; padding: 7px 11px; border: 0; border-radius: 10px; color: white; background: var(--dark); }
 .focus-card { display: flex; align-items: center; justify-content: space-between; margin: 28px 24px 18px; padding: 18px; border: 1px solid #cfe0ff; border-radius: 20px; background: #f6f9ff; }
 .focus-card strong { display: block; margin-top: 6px; font-size: 15px; }
 .focus-value { color: var(--blue-strong); font-size: 28px; }
+.pulsing { animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: .35; transform: scale(.75); } }
+.request-panel { margin: 0 24px 15px; padding: 15px 17px; border: 1px solid var(--line); border-radius: 18px; background: white; }
+.request-panel dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 8px 0 0; }
+.request-panel dt { color: var(--muted); font-size: 10px; }
+.request-panel dd { overflow-wrap: anywhere; margin: 4px 0 0; font-size: 11px; }
+.request-panel pre { overflow-x: auto; max-height: 180px; margin: 13px 0 0; padding: 11px; border-radius: 12px; background: #f4f4f1; font-size: 10px; white-space: pre-wrap; }
 .composer { display: flex; gap: 10px; margin: 0 24px; padding: 7px 8px 7px 16px; border: 1px solid var(--line); border-radius: 24px; background: white; }
 .composer input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--ink); background: transparent; }
 .composer button { width: 38px; height: 38px; border: 0; border-radius: 50%; color: white; background: var(--dark); font-size: 22px; }
 .content-page { padding-bottom: 24px; }
 .page-heading { justify-content: space-between; padding-top: 34px; }
 .profile-chip { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; color: var(--dark); background: #efe0cf; }
+.timeline-toolbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin: 0 24px 12px; text-align: center; }
+.soft-button { border: 0; color: var(--ink); background: transparent; font-size: 12px; }
+.soft-button:first-child { text-align: left; }
+.soft-button:last-child { text-align: right; }
 .date-strip { display: flex; justify-content: space-between; margin: 20px 24px 25px; color: #b0b0ac; font-size: 14px; }
 .date-button { width: 32px; height: 42px; border: 0; color: #aaa; background: transparent; }
 .reset-date { border: 0; cursor: pointer; }

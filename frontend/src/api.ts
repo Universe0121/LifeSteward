@@ -31,6 +31,19 @@ export type LifeEventsResponse = {
 
 const api_base = import.meta.env.VITE_API_BASE || "/api";
 
+async function requestError(response: Response, request_name: string): Promise<Error> {
+  let message = `${request_name} request failed`;
+  try {
+    const payload = await response.json() as { message?: unknown };
+    if (typeof payload.message === "string" && payload.message.trim()) {
+      message = payload.message.trim();
+    }
+  } catch {
+    // The status still gives the user an actionable error when the body is not JSON.
+  }
+  return new Error(`${message} (${response.status})`);
+}
+
 export async function postChat(chat_request: ChatRequest): Promise<ChatResponse> {
   const response = await fetch(`${api_base}/v1/chat`, {
     method: "POST",
@@ -39,7 +52,7 @@ export async function postChat(chat_request: ChatRequest): Promise<ChatResponse>
   });
 
   if (!response.ok) {
-    throw new Error(`chat request failed: ${response.status}`);
+    throw await requestError(response, "chat");
   }
 
   return response.json() as Promise<ChatResponse>;
@@ -53,7 +66,7 @@ export async function getLifeEvents(
   const response = await fetch(`${api_base}/v1/life-events?${search}`);
 
   if (!response.ok) {
-    throw new Error(`life-events request failed: ${response.status}`);
+    throw await requestError(response, "life-events");
   }
 
   return response.json() as Promise<LifeEventsResponse>;
