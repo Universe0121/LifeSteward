@@ -87,8 +87,8 @@ def create_llm_service_from_environment() -> LLMService:
     provider = os.getenv("LLM_PROVIDER", "qwen").strip().lower()
     model_name = os.getenv("MODEL_NAME", "").strip()
 
-    if provider != "qwen":
-        raise ValueError("Only the qwen LLM provider is enabled")
+    if provider not in {"qwen", "stepfun"}:
+        raise ValueError("Only the qwen or stepfun LLM provider is enabled")
 
     from core.providers.qwen_provider import (
         DASHSCOPE_COMPATIBLE_BASE_URL,
@@ -96,11 +96,11 @@ def create_llm_service_from_environment() -> LLMService:
     )
 
     return QwenProvider(
-        api_key=os.getenv("DASHSCOPE_API_KEY", ""),
-        model_name=model_name or "qwen-plus",
+        api_key=os.getenv("STEP_API_KEY", os.getenv("DASHSCOPE_API_KEY", "")),
+        model_name=model_name or ("step-3.7-flash" if provider == "stepfun" else "qwen-plus"),
         base_url=os.getenv(
-            "DASHSCOPE_BASE_URL",
-            DASHSCOPE_COMPATIBLE_BASE_URL,
+            "STEP_BASE_URL" if provider == "stepfun" else "DASHSCOPE_BASE_URL",
+            "https://api.stepfun.com/step_plan/v1" if provider == "stepfun" else DASHSCOPE_COMPATIBLE_BASE_URL,
         ),
         temperature=float(os.getenv("TEMPERATURE", "0.7")),
         timeout=float(os.getenv("LLM_TIMEOUT", "30")),
