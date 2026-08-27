@@ -6,7 +6,9 @@ import json
 import unittest
 from collections import deque
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from agents.master_agent import MasterAgent
 from agents.state import AgentState
@@ -58,6 +60,24 @@ def event_payload(**overrides: Any) -> dict[str, Any]:
 
 
 class MasterAgentFlowTest(unittest.TestCase):
+    def test_schedule_sentence_creates_meeting_and_reminder_events(self) -> None:
+        source = "明天下午三点有组会，提醒我提前半小时准备汇报材料。"
+        llm_service = QueueLLMService(
+            [
+                json.dumps({"intent": "casual_chat"}),
+                json.dumps(event_payload(event_type="schedule", event_content="组会", event_time="明天下午三点"), ensure_ascii=False),
+                "已经记下组会和提醒。",
+            ]
+        )
+
+        result = MasterAgent(llm_service=llm_service).process(create_state(source))
+
+        self.assertEqual(result["intent"], "record_event")
+        self.assertEqual(len(result["extracted_events"]), 2)
+        self.assertEqual({event["event_type"] for event in result["extracted_events"]}, {"schedule", "reminder"})
+        times = {event["event_type"]: event["event_time"] for event in result["extracted_events"]}
+        self.assertEqual(times["schedule"], datetime(2026, 8, 28, 15, 0, tzinfo=ZoneInfo("Asia/Shanghai")))
+        self.assertEqual(times["reminder"], datetime(2026, 8, 28, 14, 30, tzinfo=ZoneInfo("Asia/Shanghai")))
     def test_record_event_flow_extracts_event_and_returns_response(self) -> None:
         llm_service = QueueLLMService(
             [

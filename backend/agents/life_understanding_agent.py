@@ -1,11 +1,14 @@
 """Agent that extracts structured life events from natural language."""
 
 import json
+import re
 from collections.abc import Mapping
+from datetime import datetime, timedelta
 from typing import Any
 
 from agents.state import AgentState
 from core.llm_service import LLMService, get_llm_service, load_prompt
+from services.schedule_time import parse_advance_minutes, parse_chinese_datetime
 
 
 class LifeUnderstandingAgent:
@@ -33,8 +36,8 @@ class LifeUnderstandingAgent:
                 "user_input": state["user_input"],
             },
         )
-        state["extracted_events"] = self._parse_events(
-            raw_response,
+        state["extracted_events"] = normalize_schedule_events(
+            self._parse_events(raw_response, state["user_input"]),
             state["user_input"],
         )
         for event in state["extracted_events"]:
@@ -92,3 +95,44 @@ class LifeUnderstandingAgent:
         except (TypeError, ValueError):
             return 0.5
         return min(1.0, max(0.0, importance_score))
+
+
+def normalize_schedule_events(
+    events: list[dict[str, Any]],
+    source_text: str,
+    now: datetime | None = None,
+) -> list[dict[str, Any]]:
+    """Normalize relative schedule times and split one reminder into an event."""
+
+    normalized = [dict(event) for event in events]
+    base_time = parse_chinese_datetime(source_text, now=now)
+    advance_minutes = parse_advance_minutes(source_text)
+    is_schedule = any(term in source_text for term in ("组会", "会议", "日程"))
+    for event in normalized:
+        parsed_time = parse_chinese_datetime(str(event.get("event_time", "")), now=now)
+        if parsed_time is None:
+            parsed_time = base_time
+        if parsed_time is not None:
+            event["event_time"] = parsed_time
+        if is_schedule and event.get("event_type") == "other":
+            event["event_type"] = "schedule"
+
+    if base_time is not None and advance_minutes is not None and "提醒" in source_text:
+        reminder_match = re.search(
+            r"提醒我提前(?:半小时|\d+\s*分钟)(?P<task>准备[^。.!！]+)",
+            source_text,
+        )
+        task = reminder_match.group("task").strip() if reminder_match else "提前准备"
+        reminder = dict(normalized[0]) if normalized else {
+            "event_type": "reminder",
+            "event_content": task,
+            "source": "text",
+            "source_text": source_text,
+            "importance_score": 0.5,
+        }
+        reminder["event_type"] = "reminder"
+        reminder["event_content"] = task
+        reminder["event_time"] = base_time - timedelta(minutes=advance_minutes)
+        reminder["source_text"] = source_text
+        normalized.append(reminder)
+    return normalized
