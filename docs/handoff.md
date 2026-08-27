@@ -40,20 +40,41 @@
 - 不修改冻结 API 字段、变量命名和 Agent 核心职责。
 - 实际链路：`User Input -> FastAPI -> Master Agent -> Life Understanding Agent -> Interaction Agent -> assistant_response`。
 
-## 启动方式
+## 前后端联调启动方式
 
-在 `frontend` 目录执行：
+后端和前端需要在两个终端分别启动。
+
+终端 1：
 
 ```text
-npm install
-npm run dev
+cd backend
+python -m uvicorn main:app --reload --port 8000
 ```
 
-访问 `http://localhost:5173`，通过底部导航查看五个页面：`/`、`/chat`、`/timeline`、`/profile`、`/customize`。
+终端 2：
 
-## 环境限制
+```text
+cd frontend
+pnpm install
+pnpm dev
+```
 
-本轮检查时系统未检测到 `node` 和 `npm`，因此无法在当前机器执行 `npm install` 和 `npm run build`。安装 Node.js 后重新执行上述命令即可验证。
+访问 `http://localhost:5173`，Vite 会把 `/api` 请求代理到 `http://localhost:8000`。可先检查后端依赖状态：
+
+```text
+curl http://127.0.0.1:8000/api/health
+```
+
+也可以设置 `VITE_API_BASE` 指向其他后端地址；未设置时默认使用 `/api`。
+
+## 真实链路依赖
+
+- `POSTGRES_DSN`：必须指向可连接且已安装 `vector` 扩展的 PostgreSQL。
+- `REDIS_URL`：运行 Redis 基础设施检查时需要配置。
+- `LLM_PROVIDER=qwen` 时需要 `DASHSCOPE_API_KEY`。
+- `LLM_PROVIDER=stepfun` 时生成链路需要 `STEP_API_KEY`，嵌入链路仍需要 `DASHSCOPE_API_KEY`。
+
+请将这些值写入本机 `backend/.env`，不要提交真实密钥或连接凭据。`GET /api/health` 返回 `degraded`，或测试因为缺少外部依赖而跳过，都不代表真实生产端到端链路已经通过。
 
 ## 已实现交互
 
