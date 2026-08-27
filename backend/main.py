@@ -2,6 +2,7 @@
 
 import os
 from contextlib import asynccontextmanager
+from datetime import date
 from fastapi import FastAPI, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -93,13 +94,20 @@ def mock_chat(chat_request: ChatRequest) -> ChatResponse:
 def life_events(
     user_id: str = Query(..., min_length=1),
     days: int = Query(7, ge=1, le=30),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
 ) -> LifeEventsResponse:
     """Return recent persisted life events through the shared SQL tool."""
 
     root: CompositionRoot | None = getattr(app.state, "composition_root", None)
     if root is None:
         raise RuntimeError("Production composition root is not initialized")
-    items = LifeEventQueryService(root.sql_tool).get_recent_events(user_id, days)
+    if (start_date is None) != (end_date is None):
+        raise ValueError("start_date and end_date must be provided together")
+    if start_date is not None and end_date is not None:
+        items = root.sql_tool.get_events_in_range(user_id, start_date, end_date)
+    else:
+        items = LifeEventQueryService(root.sql_tool).get_recent_events(user_id, days)
     return LifeEventsResponse(
         items=[LifeEventItem.model_validate(item) for item in items],
         count=len(items),

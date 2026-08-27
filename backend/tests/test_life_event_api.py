@@ -58,6 +58,18 @@ class LifeEventApiTestCase(unittest.TestCase):
         self.assertEqual(response.json(), {"items": [], "count": 0})
         self.sql_tool.get_recent_events.assert_called_once_with("10001", days=7)
 
+    def test_date_range_query_uses_explicit_range(self) -> None:
+        self.sql_tool.get_events_in_range.return_value = []
+
+        response = self.client.get(
+            "/api/v1/life-events",
+            params={"user_id": "10001", "start_date": "2026-08-28", "end_date": "2026-08-29"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.sql_tool.get_events_in_range.assert_called_once()
+        self.sql_tool.get_recent_events.assert_not_called()
+
     def test_tool_error_is_not_swallowed(self) -> None:
         self.sql_tool.get_recent_events.side_effect = RuntimeError("database unavailable")
         response = self.client.get(

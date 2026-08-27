@@ -61,8 +61,15 @@ export async function postChat(chat_request: ChatRequest): Promise<ChatResponse>
 export async function getLifeEvents(
   user_id: number | string,
   days = 7,
+  range?: { start_date: string; end_date: string },
 ): Promise<LifeEventsResponse> {
-  const search = new URLSearchParams({ user_id: String(user_id), days: String(days) });
+  const search = new URLSearchParams({ user_id: String(user_id) });
+  if (range) {
+    search.set("start_date", range.start_date);
+    search.set("end_date", range.end_date);
+  } else {
+    search.set("days", String(days));
+  }
   const response = await fetch(`${api_base}/v1/life-events?${search}`);
 
   if (!response.ok) {

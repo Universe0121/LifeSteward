@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from collections.abc import Iterable
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from core.database import DatabaseClient
+
+SHANGHAI = ZoneInfo("Asia/Shanghai")
 
 
 def _coerce_datetime(value: Any) -> datetime | None:
@@ -60,6 +63,38 @@ class SQLTool:
             ORDER BY COALESCE(event_time, created_at) DESC, id DESC
             """,
             (str(user_id), cutoff),
+        )
+
+    def get_events_in_range(
+        self, user_id: str, start_date: date, end_date: date
+    ) -> list[dict[str, Any]]:
+        if end_date < start_date:
+            raise ValueError("end_date must be on or after start_date")
+        start_at = datetime.combine(start_date, time.min, tzinfo=SHANGHAI).astimezone(UTC)
+        end_at = datetime.combine(
+            end_date + timedelta(days=1), time.min, tzinfo=SHANGHAI
+        ).astimezone(UTC)
+        return self._database_client.fetch_all(
+            """
+            SELECT
+                id AS life_event_id,
+                user_id,
+                conversation_id,
+                event_type,
+                event_content,
+                event_time,
+                emotion,
+                importance_score,
+                source,
+                source_text,
+                created_at
+            FROM life_events
+            WHERE user_id = %s
+              AND COALESCE(event_time, created_at) >= %s
+              AND COALESCE(event_time, created_at) < %s
+            ORDER BY COALESCE(event_time, created_at) DESC, id DESC
+            """,
+            (str(user_id), start_at, end_at),
         )
 
     def get_user_profile(self, user_id: str) -> dict[str, Any]:

@@ -14,6 +14,11 @@ const packageJson = JSON.parse(await read("package.json"));
 assert.equal(packageJson.scripts.build, "tsc && vite build");
 assert.equal(packageJson.type, "module");
 
+const nginxConfig = await read("nginx.conf");
+assert.match(nginxConfig, /location\s+\/api\//);
+assert.match(nginxConfig, /proxy_pass\s+http:\/\/core-api:8000/);
+assert.match(nginxConfig, /try_files\s+\$uri\s+\$uri\/\s+\/index\.html/);
+
 for (const page of ["Home", "ChatHome", "Timeline", "Profile", "Customize"]) {
   await read(`src/pages/${page}.tsx`);
 }
@@ -25,6 +30,8 @@ for (const field of ["user_id", "conversation_id", "user_input", "assistant_resp
 for (const contract of ["getLifeEvents", "/v1/life-events", "LifeEventsResponse", "created_at"]) {
   assert.match(apiSource, new RegExp(contract));
 }
+assert.match(apiSource, /start_date/);
+assert.match(apiSource, /end_date/);
 
 const vite = await createServer({ root: frontendRoot, server: { middlewareMode: true }, appType: "custom" });
 try {
@@ -125,6 +132,9 @@ for (const interaction of ["WorkspaceProvider", "useWorkspace", "toggleTheme", "
 for (const interaction of ["上一天", "下一天", "重新加载"]) {
   assert.match(timelineSource, new RegExp(interaction));
 }
+assert.match(timelineSource, /未来/);
+assert.match(timelineSource, /schedule/);
+assert.match(timelineSource, /reminder/);
 
 const chatSource = await read("src/pages/ChatHome.tsx");
 for (const interaction of ["快捷提问", "清空对话", "is_loading", "sessionStorage", "请求状态", "会话 ID", "意图", "提取事件", "重试"]) {

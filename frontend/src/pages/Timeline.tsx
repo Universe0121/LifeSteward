@@ -2,11 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getLifeEvents, type LifeEvent } from "../api";
 
-type EventFilter = "all" | "study" | "exercise" | "sleep";
+type EventFilter = "all" | "study" | "exercise" | "sleep" | "schedule" | "reminder";
 
 const current_user_id = 10001;
-const query_days = 7;
-const event_labels: Record<string, string> = { study: "学习", exercise: "运动", sleep: "作息" };
+const past_days = 7;
+const future_days = 30;
+const event_labels: Record<string, string> = {
+  study: "学习",
+  exercise: "运动",
+  sleep: "作息",
+  schedule: "日程",
+  reminder: "提醒",
+};
 
 function dateKey(value: string): string {
   const date = new Date(value);
@@ -16,12 +23,12 @@ function dateKey(value: string): string {
   return `${year}-${month}-${day}`;
 }
 
-function recentDates(days: number): string[] {
+function calendarDates(past: number, future: number): string[] {
   const dates: string[] = [];
   const today = new Date();
-  for (let offset = days - 1; offset >= 0; offset -= 1) {
+  for (let offset = -past; offset <= future; offset += 1) {
     const date = new Date(today);
-    date.setDate(today.getDate() - offset);
+    date.setDate(today.getDate() + offset);
     dates.push(dateKey(date.toISOString()));
   }
   return dates;
@@ -39,8 +46,9 @@ function eventTime(event: LifeEvent): string {
 }
 
 export default function Timeline() {
-  const date_options = useMemo(() => recentDates(query_days), []);
-  const [selected_date, setSelectedDate] = useState(date_options[date_options.length - 1] ?? "");
+  const date_options = useMemo(() => calendarDates(past_days, future_days), []);
+  const today_index = past_days;
+  const [selected_date, setSelectedDate] = useState(date_options[today_index] ?? "");
   const [event_filter, setEventFilter] = useState<EventFilter>("all");
   const [expanded_id, setExpandedId] = useState<number | null>(null);
   const [life_events, setLifeEvents] = useState<LifeEvent[]>([]);
@@ -52,12 +60,15 @@ export default function Timeline() {
     let cancelled = false;
     setLoading(true);
     setError("");
-    getLifeEvents(current_user_id, query_days)
+    getLifeEvents(current_user_id, 7, {
+      start_date: date_options[0] ?? "",
+      end_date: date_options[date_options.length - 1] ?? "",
+    })
       .then((response) => { if (!cancelled) setLifeEvents(response.items); })
       .catch((request_error: unknown) => { if (!cancelled) setError(request_error instanceof Error ? request_error.message : "时间轴加载失败，请稍后重试。"); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [reload_token]);
+  }, [reload_token, date_options]);
 
   const day_events = useMemo(
     () => life_events.filter((event) => eventDate(event) === selected_date),
@@ -77,10 +88,10 @@ export default function Timeline() {
 
   return (
     <section className="content-page timeline-page">
-      <header className="page-heading"><div><span className="eyebrow">{selected_date.slice(0, 4)}年{selected_label}</span><h1>个人时间轴</h1></div><button className="profile-chip reset-date" onClick={() => setSelectedDate(date_options[date_options.length - 1] ?? "")} aria-label="回到今天">●</button></header>
+      <header className="page-heading"><div><span className="eyebrow">{selected_date.slice(0, 4)}年{selected_label}</span><h1>个人时间轴</h1></div><button className="profile-chip reset-date" onClick={() => setSelectedDate(date_options[today_index] ?? "")} aria-label="回到今天">●</button></header>
       <div className="timeline-toolbar"><button className="soft-button" onClick={() => shiftDate(-1)} disabled={selected_index <= 0}>‹ <span>上一天</span></button><strong>{selected_label}</strong><button className="soft-button" onClick={() => shiftDate(1)} disabled={selected_index >= date_options.length - 1}><span>下一天</span> ›</button></div>
-      <div className="date-strip" aria-label="日期选择">{date_options.map((date) => <button className={date === selected_date ? "selected-date" : "date-button"} key={date} onClick={() => { setSelectedDate(date); setExpandedId(null); }}>{date.slice(-2)}</button>)}</div>
-      <div className="filter-row">{([['all', '全部'], ['study', '学习'], ['exercise', '运动'], ['sleep', '作息']] as const).map(([value, label]) => <button className={event_filter === value ? "filter-button active" : "filter-button"} key={value} onClick={() => setEventFilter(value)}>{label}</button>)}</div>
+      <div className="date-strip" aria-label="日期选择（含未来日期）">{date_options.map((date) => <button className={date === selected_date ? "selected-date" : "date-button"} key={date} onClick={() => { setSelectedDate(date); setExpandedId(null); }}>{date.slice(-2)}</button>)}</div>
+      <div className="filter-row">{([['all', '全部'], ['study', '学习'], ['exercise', '运动'], ['sleep', '作息'], ['schedule', '日程'], ['reminder', '提醒']] as const).map(([value, label]) => <button className={event_filter === value ? "filter-button active" : "filter-button"} key={value} onClick={() => setEventFilter(value)}>{label}</button>)}</div>
       <div className="section-title"><h2>生活记录</h2><span className="eyebrow">{filtered_events.length} 条记录</span></div>
       <div className="timeline-list">
         {loading && <div className="empty-state">正在加载生活记录…</div>}

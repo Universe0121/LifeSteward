@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import unittest
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from tools.sql_tool import SQLTool
@@ -70,6 +70,19 @@ class SQLToolTestCase(unittest.TestCase):
 
         self.assertEqual(tool.get_recent_events("10001", days=0), [])
         self.assertEqual(client.fetch_all_calls, [])
+
+    def test_get_events_in_range_uses_shanghai_day_boundaries(self) -> None:
+        client = FakeDatabaseClient(fetch_all_result=[])
+
+        SQLTool(database_client=client).get_events_in_range(
+            "10001", date(2026, 8, 28), date(2026, 8, 28)
+        )
+
+        self.assertEqual(len(client.fetch_all_calls), 1)
+        params = client.fetch_all_calls[0][1]
+        self.assertEqual(params[0], "10001")
+        self.assertEqual(params[1].isoformat(), "2026-08-27T16:00:00+00:00")
+        self.assertEqual(params[2].isoformat(), "2026-08-28T16:00:00+00:00")
 
     def test_delete_simulation_batch_is_scoped_to_user_and_conversation(self) -> None:
         client = FakeDatabaseClient()
