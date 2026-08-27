@@ -22,9 +22,10 @@ class SimulationSeedTest(unittest.TestCase):
         verify.assert_called_once_with("10001", "agent-seed")
 
     def test_main_clears_only_the_tagged_batch_before_posting(self):
-        database = type("Database", (), {"delete_simulation_batch": lambda self, user_id, conversation_id: calls.append((user_id, conversation_id))})()
+        database = object()
+        sql_tool = type("SQLTool", (), {"delete_simulation_batch": lambda self, user_id, conversation_id: calls.append((user_id, conversation_id))})()
         calls = []
-        with patch.object(seed.DatabaseClient, "from_environment", return_value=database), patch.object(seed, "post_chat", return_value={"intent": "record_event", "extracted_events": [{"event_content": "event"}]}), patch.object(seed, "verify_persistence", return_value={"event_count": 1}), patch.object(seed, "load_dotenv"), patch.object(sys, "argv", ["seed_simulation_data.py", "--count", "1", "--conversation-id", "simulation_demo"]):
+        with patch.object(seed.DatabaseClient, "from_environment", return_value=database), patch.object(seed, "SQLTool", return_value=sql_tool), patch.object(seed, "post_chat", return_value={"intent": "record_event", "extracted_events": [{"event_content": "event"}]}), patch.object(seed, "verify_persistence", return_value={"event_count": 1}), patch.object(seed, "load_dotenv"), patch.object(sys, "argv", ["seed_simulation_data.py", "--count", "1", "--conversation-id", "simulation_demo"]):
             seed.main()
         self.assertEqual(calls, [("10001", "simulation_demo")])
 

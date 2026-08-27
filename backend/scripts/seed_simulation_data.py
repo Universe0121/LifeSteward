@@ -10,6 +10,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 from core.database import DatabaseClient
+from tools.sql_tool import SQLTool
 
 DEFAULT_USER_ID = "10001"
 DEFAULT_CONVERSATION_ID = "simulation_demo"
@@ -54,7 +55,9 @@ def main() -> None:
         parser.error("--count must be between 1 and 200")
     load_dotenv(BACKEND_DIR / ".env", override=False)
     conversation_id = args.conversation_id or DEFAULT_CONVERSATION_ID
-    DatabaseClient.from_environment().delete_simulation_batch(args.user_id, conversation_id)
+    SQLTool(DatabaseClient.from_environment()).delete_simulation_batch(
+        args.user_id, conversation_id
+    )
     messages = build_messages(args.count)
     for index, message in enumerate(messages, 1):
         result = post_chat(args.api_base, args.user_id, conversation_id, message)
