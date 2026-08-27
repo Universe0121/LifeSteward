@@ -1,5 +1,6 @@
 """FastAPI application entry point for the LifeAgent backend."""
 
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,6 +47,22 @@ def demo_page() -> FileResponse:
 def simulation_demo_page() -> FileResponse:
     """Serve the real PostgreSQL/pgvector verification page."""
     return FileResponse("static/simulation-demo.html", media_type="text/html")
+
+
+@app.get("/api/health")
+def health() -> dict:
+    root: CompositionRoot | None = getattr(app.state, "composition_root", None)
+    if root is None:
+        database = {
+            "connected": False,
+        }
+    else:
+        database = root.database_client.health_check()
+    provider = os.getenv("LLM_PROVIDER", "qwen").strip().lower() or "qwen"
+    key_name = "STEP_API_KEY" if provider == "stepfun" else "DASHSCOPE_API_KEY"
+    llm = {"configured": bool(os.getenv(key_name, "").strip()), "provider": provider}
+    ready = bool(database.get("connected")) and bool(database.get("vector_extension_available")) and llm["configured"]
+    return {"status": "ok" if ready else "degraded", "database": database, "llm": llm}
 
 
 @app.post("/api/v1/chat", response_model=ChatResponse)
