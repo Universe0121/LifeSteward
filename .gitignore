@@ -34,3 +34,4 @@ backend/.deps/
 backend/.env
 __pycache__/
 *.pyc
+.superpowers/
