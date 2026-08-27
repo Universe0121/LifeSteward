@@ -75,9 +75,11 @@ def chat(chat_request: ChatRequest) -> ChatResponse:
     """Process one user chat message through the service layer."""
 
     root: CompositionRoot | None = getattr(app.state, "composition_root", None)
+    if root is None:
+        raise AgentProcessingError("Production dependencies are not initialized")
     return process_chat_message(
         chat_request,
-        master_agent=root.master_agent if root else None,
+        master_agent=root.master_agent,
     )
 
 
