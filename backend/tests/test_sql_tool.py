@@ -71,6 +71,16 @@ class SQLToolTestCase(unittest.TestCase):
         self.assertEqual(tool.get_recent_events("10001", days=0), [])
         self.assertEqual(client.fetch_all_calls, [])
 
+    def test_delete_simulation_batch_is_scoped_to_user_and_conversation(self) -> None:
+        client = FakeDatabaseClient()
+        SQLTool(database_client=client).delete_simulation_batch("10001", "simulation_demo")
+
+        self.assertEqual(len(client.execute_calls), 1)
+        query, params = client.execute_calls[0]
+        self.assertIn("DELETE FROM memories", query)
+        self.assertIn("DELETE FROM life_events", query)
+        self.assertEqual(params, ("10001", "simulation_demo", "10001", "simulation_demo"))
+
     def test_save_life_events_writes_all_rows(self) -> None:
         client = FakeDatabaseClient(fetch_one_result={"id": 1})
         tool = SQLTool(database_client=client)
@@ -177,6 +187,18 @@ class SQLToolTestCase(unittest.TestCase):
 
         with self.assertRaisesRegex(RuntimeError, "profile upsert failed"):
             tool.update_user_profile("10001", {"learning_style": "short_task"})
+
+    def test_get_user_profile_returns_profile_data(self) -> None:
+        client = FakeDatabaseClient(
+            fetch_one_result={"user_id": "10001", "profile_data": {"preferred_language": "Python"}}
+        )
+        tool = SQLTool(database_client=client)
+
+        profile = tool.get_user_profile("10001")
+
+        self.assertEqual(profile, {"preferred_language": "Python"})
+        self.assertIn("FROM user_profile", client.fetch_one_calls[0][0])
+        self.assertEqual(client.fetch_one_calls[0][1], ("10001",))
 
     def test_database_error_is_visible_to_caller(self) -> None:
         class BrokenDatabaseClient(FakeDatabaseClient):

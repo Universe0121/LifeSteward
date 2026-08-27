@@ -62,6 +62,34 @@ class SQLTool:
             (str(user_id), cutoff),
         )
 
+    def get_user_profile(self, user_id: str) -> dict[str, Any]:
+        row = self._database_client.fetch_one(
+            "SELECT profile_data FROM user_profile WHERE user_id = %s",
+            (str(user_id),),
+        )
+        if not row or not isinstance(row.get("profile_data"), dict):
+            return {}
+        return dict(row["profile_data"])
+
+    def delete_simulation_batch(self, user_id: str, conversation_id: str) -> None:
+        """Delete only demo events and their derived memories for one batch."""
+
+        self._database_client.execute(
+            """
+            WITH deleted_memories AS (
+                DELETE FROM memories
+                WHERE source_event_id IN (
+                    SELECT id FROM life_events
+                    WHERE user_id = %s AND conversation_id = %s
+                )
+                RETURNING id
+            )
+            DELETE FROM life_events
+            WHERE user_id = %s AND conversation_id = %s
+            """,
+            (str(user_id), str(conversation_id), str(user_id), str(conversation_id)),
+        )
+
     def save_life_events(self, events: Iterable[dict[str, Any]]) -> int:
         inserted_count = 0
         for event in events:

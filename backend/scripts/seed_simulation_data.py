@@ -12,6 +12,7 @@ if str(BACKEND_DIR) not in sys.path:
 from core.database import DatabaseClient
 
 DEFAULT_USER_ID = "10001"
+DEFAULT_CONVERSATION_ID = "simulation_demo"
 SCENARIOS = [
     "昨晚睡眠不足，凌晨一点才入睡，早上七点起床。", "上午完成了数学复习，专注约九十分钟。",
     "下午任务堆积时感到压力明显上升。", "傍晚快走三十分钟后，精神状态有所恢复。",
@@ -52,7 +53,8 @@ def main() -> None:
     if not 1 <= args.count <= 200:
         parser.error("--count must be between 1 and 200")
     load_dotenv(BACKEND_DIR / ".env", override=False)
-    conversation_id = args.conversation_id or datetime.now(UTC).strftime("simulation_agent_%Y%m%d_%H%M%S")
+    conversation_id = args.conversation_id or DEFAULT_CONVERSATION_ID
+    DatabaseClient.from_environment().delete_simulation_batch(args.user_id, conversation_id)
     messages = build_messages(args.count)
     for index, message in enumerate(messages, 1):
         result = post_chat(args.api_base, args.user_id, conversation_id, message)
