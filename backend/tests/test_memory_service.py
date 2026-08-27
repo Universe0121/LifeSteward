@@ -10,6 +10,7 @@ class FakeSQLTool:
     def __init__(self) -> None:
         self.saved_events = []
         self.updated_profiles = []
+        self.profile = {}
 
     def save_life_events(self, events):
         self.saved_events = list(events)
@@ -17,6 +18,9 @@ class FakeSQLTool:
 
     def update_user_profile(self, user_id, profile_data):
         self.updated_profiles.append((user_id, profile_data))
+
+    def get_user_profile(self, user_id):
+        return dict(self.profile)
 
 
 class FakeVectorSearchTool:
@@ -57,6 +61,14 @@ class MemoryServiceTest(unittest.TestCase):
         profile = {"sleep_target_hours": 8}
         self.service.update_user_profile("user-001", profile)
         self.assertEqual(self.sql_tool.updated_profiles, [("user-001", profile)])
+
+    def test_get_user_profile_delegates_to_sql_tool(self) -> None:
+        self.sql_tool.profile = {"preferred_language": "Python"}
+
+        self.assertEqual(
+            self.service.get_user_profile("user-001"),
+            {"preferred_language": "Python"},
+        )
 
     def test_tool_exception_is_propagated_to_agent_boundary(self) -> None:
         self.vector_tool.search_memories = lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("db unavailable"))

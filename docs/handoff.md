@@ -87,3 +87,9 @@ curl http://127.0.0.1:8000/api/health
 - 在 Node 环境中完成依赖安装和 Vite 构建。
 - 启动 FastAPI 后联调聊天接口。
 - 网站 Demo 验证通过后，再规划移动端迁移。
+
+## 生产前端容器
+
+`frontend/Dockerfile` 会构建 Vite 静态文件并交给 Nginx 服务，`frontend/nginx.conf`
+将 `/api/` 代理到同一容器网络中的 `core-api:8000`。生产编排需要将后端服务命名为
+`core-api`，并让前后端加入同一 Docker 网络。

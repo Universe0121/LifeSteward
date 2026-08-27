@@ -5,6 +5,7 @@ from agents.intent import Intent
 from agents.life_understanding_agent import LifeUnderstandingAgent
 from agents.master_agent import MasterAgent
 from agents.memory_agent import MemoryAgent
+from agents.profile_agent import ProfileAgent
 from agents.state import AgentState
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "LifeUnderstandingAgent",
     "MasterAgent",
     "MemoryAgent",
+    "ProfileAgent",
 ]

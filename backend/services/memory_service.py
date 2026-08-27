@@ -28,6 +28,9 @@ class MemoryService:
     def update_user_profile(self, user_id: str, user_profile: dict[str, Any]) -> None:
         raise NotImplementedError
 
+    def get_user_profile(self, user_id: str) -> dict[str, Any]:
+        raise NotImplementedError
+
     def compress_memory(self, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         raise NotImplementedError
 
@@ -73,6 +76,9 @@ class ToolMemoryService(MemoryService):
     def update_user_profile(self, user_id: str, user_profile: dict[str, Any]) -> None:
         self._sql_tool.update_user_profile(user_id, user_profile)
 
+    def get_user_profile(self, user_id: str) -> dict[str, Any]:
+        return self._sql_tool.get_user_profile(user_id)
+
     def compress_memory(self, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return deepcopy(events)
 
@@ -84,6 +90,8 @@ class FakeMemoryService(MemoryService):
         self.memories = [deepcopy(item) for item in (memories or [])]
         self.search_calls: list[dict[str, Any]] = []
         self.save_calls: list[dict[str, Any]] = []
+        self.profiles: dict[str, dict[str, Any]] = {}
+        self.updated_profiles: list[tuple[str, dict[str, Any]]] = []
 
     def search_memory(
         self,
@@ -152,7 +160,11 @@ class FakeMemoryService(MemoryService):
         return deepcopy(events)
 
     def update_user_profile(self, user_id: str, user_profile: dict[str, Any]) -> None:
-        return None
+        self.profiles[str(user_id)] = deepcopy(user_profile)
+        self.updated_profiles.append((str(user_id), deepcopy(user_profile)))
+
+    def get_user_profile(self, user_id: str) -> dict[str, Any]:
+        return deepcopy(self.profiles.get(str(user_id), {}))
 
 
 class MockMemoryService(FakeMemoryService):
@@ -176,4 +188,3 @@ class MockMemoryService(FakeMemoryService):
 
 
 InMemoryMemoryService = FakeMemoryService
-

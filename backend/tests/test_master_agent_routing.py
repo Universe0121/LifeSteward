@@ -146,6 +146,16 @@ class MasterAgentRoutingTest(unittest.TestCase):
         self.assertEqual(memory.search_calls, [])
         self.assertEqual(memory.save_calls, [])
 
+    def test_clear_profile_query_overrides_model_misclassification(self) -> None:
+        llm = QueueLLMService([json.dumps({"intent": "update_profile"}), "Python"])
+        memory = InMemoryMemoryService()
+
+        result = MasterAgent(llm_service=llm, memory_service=memory).process(
+            create_state("", "我编写代码喜欢用什么语言？")
+        )
+
+        self.assertEqual(result["intent"], "query_memory")
+
 
 if __name__ == "__main__":
     unittest.main()
