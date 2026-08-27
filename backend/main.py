@@ -20,7 +20,10 @@ from core.composition_root import CompositionRoot, build_composition_root
 async def lifespan(application: FastAPI):
     """Assemble production dependencies once when the application starts."""
     if not hasattr(application.state, "composition_root"):
-        application.state.composition_root = build_composition_root()
+        try:
+            application.state.composition_root = build_composition_root()
+        except (RuntimeError, ValueError):
+            application.state.composition_root = None
     yield
 
 

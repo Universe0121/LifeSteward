@@ -89,6 +89,24 @@ class HealthApiTestCase(unittest.TestCase):
             },
         )
 
+    def test_startup_failure_still_exposes_degraded_health(self) -> None:
+        with patch(
+            "main.build_composition_root",
+            side_effect=ValueError("POSTGRES_DSN is required"),
+        ):
+            with TestClient(app, raise_server_exceptions=False) as client:
+                response = client.get("/api/health")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "degraded")
+        self.assertFalse(payload["database"]["connected"])
+        self.assertEqual(
+            payload["database"]["error"],
+            "composition root is not initialized",
+        )
+        self.assertNotIn("POSTGRES_DSN", response.text)
+
 
 if __name__ == "__main__":
     unittest.main()
