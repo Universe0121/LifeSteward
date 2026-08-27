@@ -80,7 +80,11 @@ class HealthApiTestCase(unittest.TestCase):
             response.json(),
             {
                 "status": "degraded",
-                "database": {"connected": False},
+                "database": {
+                    "connected": False,
+                    "vector_extension_available": False,
+                    "error": "composition root is not initialized",
+                },
                 "llm": {"configured": False, "provider": "stepfun"},
             },
         )

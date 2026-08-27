@@ -55,6 +55,8 @@ def health() -> dict:
     if root is None:
         database = {
             "connected": False,
+            "vector_extension_available": False,
+            "error": "composition root is not initialized",
         }
     else:
         database = root.database_client.health_check()
