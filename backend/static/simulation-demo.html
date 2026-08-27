@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LifeSteward 真实数据链路 Demo</title>
+<style>
+body{margin:0;background:#eef3ef;color:#183126;font:15px system-ui}main{max-width:1050px;margin:32px auto;padding:0 18px}header,.panel{background:#fff;border-radius:18px;padding:22px;box-shadow:0 8px 30px #173a2512}header{margin-bottom:18px}h1,h2{margin:0 0 10px}.status{color:#527061}.grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}.events{max-height:580px;overflow:auto}.event{padding:13px 0;border-bottom:1px solid #e8eee9}.meta{font-size:12px;color:#718378;margin-top:5px}.chat{height:390px;overflow:auto;background:#f6f9f7;border-radius:12px;padding:12px}.msg{padding:10px 12px;margin:9px 0;border-radius:12px;white-space:pre-wrap}.user{background:#d8f0df;margin-left:15%}.bot{background:#e9efeb;margin-right:10%}form{display:flex;gap:8px;margin-top:10px}input{flex:1;padding:12px;border:1px solid #cbd8cf;border-radius:10px}button{border:0;border-radius:10px;padding:0 16px;background:#28784d;color:white;cursor:pointer}.error{color:#a03232}@media(max-width:800px){.grid{grid-template-columns:1fr}}
+</style></head>
+<body><main><header><h1>LifeSteward 真实数据链路 Demo</h1><div id="status" class="status">正在读取 PostgreSQL 仿真数据……</div></header>
+<div class="grid"><section class="panel"><h2>最近生活事件</h2><div id="events" class="events"></div></section>
+<section class="panel"><h2>Agent 查询验证</h2><div id="chat" class="chat"><div class="msg bot">可以问：最近为什么学习效率下降？或帮我根据近期状态制定计划。</div></div>
+<form id="form"><input id="input" value="最近为什么学习效率下降？"><button>发送</button></form></section></div></main>
+<script>
+const userId='10001',events=document.querySelector('#events'),statusEl=document.querySelector('#status'),chat=document.querySelector('#chat');
+const esc=s=>String(s??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+async function loadEvents(){try{const r=await fetch(`/api/v1/life-events?user_id=${userId}&days=30`),d=await r.json();if(!r.ok)throw Error(d.message||'读取失败');statusEl.textContent=`真实 API 已连接 · user_id=${userId} · ${d.count} 条事件`;events.innerHTML=d.items.map(x=>`<div class="event"><b>${esc(x.event_content)}</b><div class="meta">${esc(x.event_type)} · ${esc(x.emotion)} · ${new Date(x.event_time||x.created_at).toLocaleString()}</div></div>`).join('')||'暂无数据，请先运行初始化脚本。'}catch(e){statusEl.className='status error';statusEl.textContent=e.message}}
+document.querySelector('#form').onsubmit=async e=>{e.preventDefault();const input=document.querySelector('#input'),text=input.value.trim();if(!text)return;chat.insertAdjacentHTML('beforeend',`<div class="msg user">${esc(text)}</div>`);input.value='';try{const r=await fetch('/api/v1/chat',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user_id:Number(userId),conversation_id:'simulation_web_demo',user_input:text})}),d=await r.json();if(!r.ok)throw Error(d.message||'请求失败');chat.insertAdjacentHTML('beforeend',`<div class="msg bot">${esc(d.assistant_response)}</div>`)}catch(err){chat.insertAdjacentHTML('beforeend',`<div class="msg bot error">${esc(err.message)}</div>`)}chat.scrollTop=chat.scrollHeight};loadEvents();
+</script></body></html>
