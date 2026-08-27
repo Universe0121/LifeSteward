@@ -85,7 +85,9 @@ button { cursor: pointer; }
 .soft-button { border: 0; color: var(--ink); background: transparent; font-size: 12px; }
 .soft-button:first-child { text-align: left; }
 .soft-button:last-child { text-align: right; }
-.date-strip { display: flex; justify-content: space-between; margin: 20px 24px 25px; color: #b0b0ac; font-size: 14px; }
+.date-picker-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 24px 8px; color: var(--muted); font-size: 12px; }
+.date-picker { min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; color: var(--ink); background: white; }
+.date-strip { display: flex; justify-content: space-between; gap: 8px; min-width: 0; overflow-x: auto; margin: 12px 24px 25px; padding: 15px 4px 4px; color: #b0b0ac; font-size: 14px; scrollbar-width: thin; }
 .date-button { width: 32px; height: 42px; border: 0; color: #aaa; background: transparent; }
 .reset-date { border: 0; cursor: pointer; }
 .selected-date { display: grid; place-items: center; width: 42px; height: 58px; margin-top: -15px; border-radius: 22px; color: white; background: var(--dark); font-size: 18px; font-weight: 700; }

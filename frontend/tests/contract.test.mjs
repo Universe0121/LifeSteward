@@ -132,9 +132,16 @@ for (const interaction of ["WorkspaceProvider", "useWorkspace", "toggleTheme", "
 for (const interaction of ["上一天", "下一天", "重新加载"]) {
   assert.match(timelineSource, new RegExp(interaction));
 }
+for (const interaction of ["date-picker", "min=", "max=", "onChange", "start_date", "end_date"]) {
+  assert.match(timelineSource, new RegExp(interaction));
+}
 assert.match(timelineSource, /未来/);
 assert.match(timelineSource, /schedule/);
 assert.match(timelineSource, /reminder/);
+
+const stylesSource = await read("src/styles.css");
+assert.match(stylesSource, /\.date-strip[^}]*overflow-x:\s*auto/);
+assert.match(stylesSource, /\.date-strip[^}]*min-width:\s*0/);
 
 const chatSource = await read("src/pages/ChatHome.tsx");
 for (const interaction of ["快捷提问", "清空对话", "is_loading", "sessionStorage", "请求状态", "会话 ID", "意图", "提取事件", "重试"]) {
