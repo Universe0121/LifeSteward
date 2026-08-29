@@ -34,6 +34,9 @@ class SettingsTest(unittest.TestCase):
             "DASHSCOPE_API_KEY",
             "POSTGRES_DSN",
             "REDIS_URL",
+            "SPEECH_TO_TEXT_BASE_URL",
+            "SPEECH_TO_TEXT_API_KEY",
+            "SPEECH_TO_TEXT_MODEL",
         )
         for key in required_keys:
             self.assertIn(f"{key}=", content)

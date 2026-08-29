@@ -30,6 +30,9 @@ for (const field of ["user_id", "conversation_id", "user_input", "assistant_resp
 for (const contract of ["getLifeEvents", "/v1/life-events", "LifeEventsResponse", "created_at"]) {
   assert.match(apiSource, new RegExp(contract));
 }
+for (const contract of ["postSpeechToText", "/v1/speech-to-text", "FormData", "duration_ms"]) {
+  assert.match(apiSource, new RegExp(contract));
+}
 assert.match(apiSource, /start_date/);
 assert.match(apiSource, /end_date/);
 
@@ -58,6 +61,22 @@ try {
     conversation_id: "conv-test",
     user_input: "测试",
   });
+  globalThis.fetch = originalFetch;
+
+  globalThis.fetch = async (input, init) => {
+    capturedRequest = { input: String(input), init };
+    return new Response(JSON.stringify({ text: "语音文字", language: "zh-CN", duration_ms: 1000 }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  assert.deepEqual(await api.postSpeechToText(new Blob(["audio"], { type: "audio/webm" }), 10001), { text: "语音文字", language: "zh-CN", duration_ms: 1000 });
+  assert.equal(capturedRequest.input, "/api/v1/speech-to-text");
+  assert.equal(capturedRequest.init.method, "POST");
+  assert.equal(capturedRequest.init.headers, undefined);
+  assert.equal(capturedRequest.init.body.get("user_id"), "10001");
+  assert.equal(capturedRequest.init.body.get("language"), "zh-CN");
+  assert.equal(capturedRequest.init.body.get("audio").name, "recording.webm");
   globalThis.fetch = originalFetch;
 
   const chatModule = await vite.ssrLoadModule("/src/pages/ChatHome.tsx");
@@ -149,6 +168,13 @@ for (const interaction of ["快捷提问", "清空对话", "is_loading", "sessio
 }
 for (const fakeSuccess of ["我先帮你记下了", "演示模式：已使用 mock 回复"]) {
   assert.doesNotMatch(chatSource, new RegExp(fakeSuccess));
+}
+for (const interaction of ["VoiceInputButton", "useVoiceInput", "voice.error", "setUserInput\\(text\\)"]) {
+  assert.match(chatSource, new RegExp(interaction));
+}
+const voiceHookSource = await read("src/hooks/useVoiceInput.ts");
+for (const state of ["idle", "recording", "transcribing", "error", "MediaRecorder", "getUserMedia"]) {
+  assert.match(voiceHookSource, new RegExp(state));
 }
 
 console.log("frontend contract passed");
