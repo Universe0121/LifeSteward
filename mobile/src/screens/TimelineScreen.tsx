@@ -5,7 +5,7 @@ import { ActivityIndicator, Modal, Pressable, RefreshControl, ScrollView, StyleS
 import { api_client, is_mock_api_mode, type LifeEvent } from '../api';
 import { useAuth } from '../state/AuthContext';
 import { useWorkspace } from '../state/WorkspaceContext';
-import { add_days, format_date_label, local_date_key, month_label } from '../utils/date';
+import { add_days, date_from_key, format_date_label, local_date_key, month_label } from '../utils/date';
 
 const query_days = 30;
 const filters = [['all', '全部'], ['study', '学习'], ['exercise', '运动'], ['sleep', '作息']] as const;
@@ -14,9 +14,8 @@ const event_labels: Record<string, string> = { study: '学习', exercise: '运�
 
 function parse_event_date(value: string | null | undefined): Date | null {
   if (!value) return null;
-  const normalized = value.trim().replace(/^([0-9]{4}-[0-9]{2}-[0-9]{2})\s+([0-9]{2}:[0-9]{2})(?::([0-9]{2}))?$/, '$1T$2:$3');
-  const fixed = normalized.endsWith(':') ? `${normalized}00` : normalized;
-  const date = new Date(fixed);
+  const normalized = value.trim().replace(/^([0-9]{4}-[0-9]{2}-[0-9]{2})\s+([0-9]{2}:[0-9]{2})(?::([0-9]{2}))?$/, (_match, date, time, seconds) => `${date}T${time}:${seconds ?? '00'}`);
+  const date = new Date(normalized);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
@@ -26,7 +25,7 @@ function date_key(date: Date): string {
 
 function build_date_options(): string[] {
   const today = local_date_key();
-  return Array.from({ length: 14 }, (_, index) => add_days(today, -(13 - index)));
+  return Array.from({ length: 31 }, (_, index) => add_days(today, -(30 - index)));
 }
 
 function event_date(event: LifeEvent): string {
@@ -37,6 +36,11 @@ function event_date(event: LifeEvent): string {
 function event_time(event: LifeEvent): string {
   const date = parse_event_date(event.event_time ?? event.created_at);
   return date ? date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) : '时间未记录';
+}
+
+function emotion_label(value: string | null | undefined): string {
+  const normalized = value?.trim().toLocaleLowerCase();
+  return !normalized || normalized === 'none' || normalized === 'null' ? '未记录情绪' : value!.trim();
 }
 
 function merge_date_options(current_dates: string[], events: LifeEvent[]): string[] {
@@ -111,12 +115,18 @@ export default function TimelineScreen() {
     setCalendarMonth((current) => new Date(current.getFullYear(), current.getMonth() + offset, 1));
   }
 
+  function open_calendar() {
+    const selected = date_from_key(selected_date);
+    setCalendarMonth(selected ?? new Date());
+    setCalendarVisible(true);
+  }
+
   return <ScrollView style={{ backgroundColor: colors.canvas }} contentContainerStyle={[styles.content, { backgroundColor: colors.canvas }]} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void load_events()} tintColor={colors.ink} />}>
-    <View style={styles.heading}>
+      <View style={styles.heading}>
       <View><Text style={[styles.eyebrow, { color: colors.muted }]}>{selected_label}</Text><Text style={[styles.title, { color: colors.ink }]}>日历</Text></View>
-      <Pressable accessibilityRole="button" accessibilityLabel="打开大日历选择日期" onPress={() => setCalendarVisible(true)} hitSlop={8} style={styles.calendar_button}><MaterialCommunityIcons color={colors.ink} name="calendar-month-outline" size={26} /></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="打开大日历选择日期" onPress={open_calendar} hitSlop={8} style={styles.calendar_button}><MaterialCommunityIcons color={colors.ink} name="calendar-month-outline" size={26} /></Pressable>
     </View>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.date_strip}>
+    <ScrollView horizontal nestedScrollEnabled directionalLockEnabled showsHorizontalScrollIndicator={false} contentContainerStyle={styles.date_strip}>
       {dates.map((date) => <Pressable accessibilityRole="button" accessibilityState={{ selected: date === selected_date }} accessibilityLabel={`选择${format_date_label(date, true)}`} key={date} onPress={() => choose_date(date)} style={[styles.date_button, date === selected_date && { backgroundColor: colors.ink }]}><Text style={[styles.date_week, { color: date === selected_date ? colors.muted : colors.muted }]}>{date === today ? '今天' : date.slice(5, 7) + '/'}</Text><Text style={[styles.date_text, { color: date === selected_date ? colors.paper : colors.ink }]}>{date.slice(-2)}</Text></Pressable>)}
     </ScrollView>
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filter_row}>
@@ -131,7 +141,7 @@ export default function TimelineScreen() {
       const featured = index === 0;
       return <Pressable accessibilityRole="button" accessibilityLabel={`${event.event_content}，${is_expanded ? '收起详情' : '查看原话'}`} key={event.life_event_id} onPress={() => setExpanded(is_expanded ? null : event.life_event_id)} style={[styles.event, { backgroundColor: featured ? colors.ink : colors.paper }]}>
         <View style={[styles.node, { backgroundColor: featured ? colors.paper : colors.ink }]}><MaterialCommunityIcons color={featured ? colors.ink : colors.paper} name="leaf" size={13} /></View>
-        <View style={styles.event_copy}><View style={styles.meta}><Text style={[styles.event_type, { color: featured ? colors.blue_strong : colors.ink }]}>{event_labels[event.event_type] ?? event.event_type}</Text><Text style={[styles.muted, { color: colors.muted }]}>{event_time(event)}</Text></View><Text style={[styles.event_content, { color: featured ? colors.paper : colors.ink }]}>{event.event_content}</Text><Text style={[styles.muted, { color: colors.muted }]}>AI 摘要 · {event.emotion || '未记录情绪'}</Text>{is_expanded && <View style={[styles.detail, { borderTopColor: featured ? '#555555' : colors.line }]}><Text style={[styles.detail_label, { color: featured ? colors.blue_strong : colors.ink }]}>你当时告诉 AI 的原话</Text><Text style={[styles.detail_text, { color: featured ? colors.paper : colors.ink }]}>{event.source_text || event.event_content}</Text><Text style={[styles.muted, { color: colors.muted }]}>重要程度 {Math.round((Number(event.importance_score) || 0) * 100)}% · 来源 {event.source || 'life_events'}</Text></View>}</View>
+        <View style={styles.event_copy}><View style={styles.meta}><Text style={[styles.event_type, { color: featured ? colors.blue_strong : colors.ink }]}>{event_labels[event.event_type] ?? event.event_type}</Text><Text style={[styles.muted, { color: colors.muted }]}>{event_time(event)}</Text></View><Text style={[styles.event_content, { color: featured ? colors.paper : colors.ink }]}>{event.event_content}</Text><Text style={[styles.muted, { color: colors.muted }]}>AI 摘要 · {emotion_label(event.emotion)}</Text>{is_expanded && <View style={[styles.detail, { borderTopColor: featured ? '#555555' : colors.line }]}><Text style={[styles.detail_label, { color: featured ? colors.blue_strong : colors.ink }]}>你当时告诉 AI 的原话</Text><Text style={[styles.detail_text, { color: featured ? colors.paper : colors.ink }]}>{event.source_text || event.event_content}</Text><Text style={[styles.muted, { color: colors.muted }]}>重要程度 {Math.round((Number(event.importance_score) || 0) * 100)}% · 来源 {event.source || 'life_events'}</Text></View>}</View>
         <Text style={[styles.importance, { color: colors.muted }]}>{is_expanded ? '收起' : (Number(event.importance_score) || 0).toFixed(1)}</Text>
       </Pressable>;
     })}

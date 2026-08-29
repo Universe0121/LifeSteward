@@ -2,9 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { api_client, type ChatHistoryItem } from '../api';
+import { api_client, type ChatHistoryItem, type ChatResponse } from '../api';
 import VoiceInputButton from '../components/VoiceInputButton';
-import { extract_task_name, is_plan_request, is_task_only_request, normalize_plan_items, requested_date_key } from '../domain/planning';
+import { classify_chat_action, extract_task_name, normalize_plan_items, requested_date_key } from '../domain/planning';
 import { useConversationId } from '../hooks/useConversationId';
 import { useVoiceInput } from '../hooks/useVoiceInput';
 import { useAuth } from '../state/AuthContext';
@@ -60,10 +60,24 @@ function history_from_messages(messages: Message[]): ChatHistoryItem[] {
     .map(({ role, content }) => ({ role, content }));
 }
 
+export function history_without_failed_attempt(
+  messages: Message[],
+  error_index: number | undefined,
+  failed_input: string,
+): Message[] {
+  if (error_index === undefined) return messages;
+  const history = messages.slice(0, error_index);
+  const last_message = history[history.length - 1];
+  if (last_message?.role === 'user' && last_message.content === failed_input) {
+    history.pop();
+  }
+  return history;
+}
+
 export default function ChatScreen() {
   const { colors, add_task, add_plans } = useWorkspace();
   const { user_id, display_name } = useAuth();
-  const conversation_id = useConversationId();
+  const conversation_id = useConversationId(user_id);
   const list_ref = useRef<FlatList<Message>>(null);
   const messages_ref = useRef<Message[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -131,14 +145,14 @@ export default function ChatScreen() {
     commit_messages([...messages_ref.current, message]);
   }
 
-  function apply_chat_result(input: string, generated_plan: Array<Record<string, unknown>> | undefined) {
+  function apply_chat_result(input: string, response: ChatResponse) {
     const plan_date = requested_date_key(input);
-    if (is_task_only_request(input)) {
-      add_task(extract_task_name(input), plan_date);
-      return;
-    }
-    if (is_plan_request(input)) {
-      const plans = normalize_plan_items(generated_plan);
+    const action = classify_chat_action(input, response.intent, response.generated_plan);
+    if (action === 'task') {
+      const task_name = extract_task_name(input);
+      if (task_name) add_task(task_name, plan_date);
+    } else if (action === 'plan') {
+      const plans = normalize_plan_items(response.generated_plan);
       if (plans.length > 0) add_plans(plans, plan_date);
     }
   }
@@ -151,13 +165,14 @@ export default function ChatScreen() {
     const retry_error_index = retry
       ? [...current_messages].map((message, index) => ({ message, index })).reverse().find(({ message }) => message.kind === 'error' && message.failed_input === content)?.index
       : undefined;
-    const history_source = retry_error_index === undefined
-      ? current_messages
-      : current_messages.slice(0, retry_error_index);
+    const history_source = retry
+      ? history_without_failed_attempt(current_messages, retry_error_index, content)
+      : current_messages;
     const conversation_history = history_from_messages(history_source);
 
     if (!retry) persist_next_message({ id: `${Date.now()}-user`, role: 'user', content });
-    else if (retry_error_index !== undefined) commit_messages(current_messages.slice(0, retry_error_index));
+    else if (retry_error_index !== undefined) commit_messages(history_source);
+    else persist_next_message({ id: `${Date.now()}-user-retry`, role: 'user', content });
     setUserInput('');
     setFailedInput(null);
     setSending(true);
@@ -168,7 +183,7 @@ export default function ChatScreen() {
         user_input: content,
         conversation_history,
       });
-      apply_chat_result(content, response.generated_plan);
+      apply_chat_result(content, response);
       persist_next_message({ id: `${Date.now()}-assistant`, role: 'assistant', content: response.assistant_response });
     } catch {
       setFailedInput(content);

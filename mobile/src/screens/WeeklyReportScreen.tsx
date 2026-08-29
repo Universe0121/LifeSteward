@@ -34,23 +34,25 @@ export default function WeeklyReportScreen({ route }: Props) {
       const svg = await api_client.getWeeklyPosterSvg(report.report_id, report.poster_url);
       const directory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
       if (!directory) throw new Error('cache unavailable');
-      file_uri = `${directory}lifeagent-weekly-report-${report.report_id}.svg`;
+      file_uri = `${directory}lifeagent-weekly-report-${report.report_id}-${Date.now()}.svg`;
       await FileSystem.writeAsStringAsync(file_uri, svg, { encoding: FileSystem.EncodingType.UTF8 });
       await Sharing.shareAsync(file_uri, { mimeType: 'image/svg+xml', dialogTitle: '分享 LifeAgent 周报海报' });
     } catch {
       setError('海报分享暂时失败，请稍后重试。');
     } finally {
-      if (file_uri) {
-        try {
-          await FileSystem.deleteAsync(file_uri, { idempotent: true });
-        } catch {
-          // Temporary share files are best-effort cleanup.
-        }
-      }
+      if (file_uri) schedule_share_file_cleanup(file_uri);
       setSharing(false);
     }
   }
 
   return <ScrollView contentContainerStyle={[styles.content, { backgroundColor: colors.canvas }]}><View style={[styles.cover, { backgroundColor: colors.ink }]}><MaterialCommunityIcons color={colors.blue_strong} name="chart-box-outline" size={34} /><Text style={[styles.kicker, { color: colors.muted }]}>LIFEAGENT WEEKLY</Text><Text style={[styles.cover_title, { color: colors.paper }]}>{title}</Text><Text style={[styles.cover_summary, { color: colors.muted }]}>{summary}</Text></View><View style={[styles.stats, { backgroundColor: colors.paper, borderColor: colors.line }]}><View><Text style={[styles.stat_value, { color: colors.ink }]}>{total}</Text><Text style={[styles.stat_label, { color: colors.muted }]}>本周记录</Text></View><View><Text style={[styles.stat_value, { color: colors.ink }]}>{highlights.length}</Text><Text style={[styles.stat_label, { color: colors.muted }]}>生活高光</Text></View><View><Text style={[styles.stat_value, { color: colors.ink }]}>{Math.round(completion_rate * 100)}%</Text><Text style={[styles.stat_label, { color: colors.muted }]}>完成度</Text></View></View><Text style={[styles.section_title, { color: colors.ink }]}>海报预览</Text><View style={styles.poster_wrap}><WeeklyPosterPreview height={280} poster_url={report.poster_url} report_id={report.report_id} width={280} /></View><Text style={[styles.section_title, { color: colors.ink }]}>这一周发生了什么</Text>{highlights.length === 0 ? <Text style={[styles.muted, { color: colors.muted }]}>本周还没有高光记录。</Text> : highlights.map((item, index) => <View key={`${item.title}-${index}`} style={[styles.highlight, { backgroundColor: colors.paper, borderColor: colors.line }]}><View style={[styles.number, { backgroundColor: colors.blue }]}><Text style={[styles.number_text, { color: colors.ink }]}>{index + 1}</Text></View><View style={styles.highlight_copy}><Text style={[styles.highlight_title, { color: colors.ink }]}>{item.title ?? '生活片段'}</Text><Text style={[styles.muted, { color: colors.muted }]}>{item.summary ?? item.evidence?.join('；') ?? ''}</Text></View></View>)}<Text style={[styles.section_title, { color: colors.ink }]}>给下周的一点建议</Text>{suggestions.length === 0 ? <Text style={[styles.muted, { color: colors.muted }]}>继续记录，下一次回顾会更清晰。</Text> : suggestions.map((suggestion, index) => <View key={`${suggestion}-${index}`} style={styles.suggestion}><MaterialCommunityIcons color={colors.ink} name="arrow-right-bottom" size={19} /><Text style={[styles.suggestion_text, { color: colors.ink }]}>{suggestion}</Text></View>)}<Pressable accessibilityRole="button" accessibilityLabel="分享周报海报" disabled={sharing} onPress={() => void share_poster()} style={[styles.share, { backgroundColor: colors.ink }]}>{sharing ? <ActivityIndicator color={colors.paper} /> : <><MaterialCommunityIcons color={colors.paper} name="share-variant-outline" size={20} /><Text style={[styles.share_text, { color: colors.paper }]}>分享海报</Text></>}</Pressable>{error !== '' && <View style={styles.error_row}><Text style={styles.error}>{error}</Text><Pressable accessibilityRole="button" onPress={() => void share_poster()}><Text style={[styles.retry, { color: colors.ink }]}>重试</Text></Pressable></View>}</ScrollView>;
+}
+
+function schedule_share_file_cleanup(file_uri: string): void {
+  // Android share targets may read the URI after shareAsync resolves. Keep
+  // the file briefly, then remove it from the app cache asynchronously.
+  setTimeout(() => {
+    void FileSystem.deleteAsync(file_uri, { idempotent: true }).catch(() => undefined);
+  }, 60_000);
 }
 const styles = StyleSheet.create({ content: { flexGrow: 1, padding: 24, paddingBottom: 38 }, cover: { minHeight: 240, padding: 30, borderRadius: 8, justifyContent: 'flex-end', gap: 8 }, kicker: { marginTop: 18, fontSize: 11, letterSpacing: 1.1 }, cover_title: { fontSize: 26, lineHeight: 33, fontWeight: '700' }, cover_summary: { fontSize: 14, lineHeight: 22 }, stats: { marginVertical: 22, padding: 16, borderWidth: 1, borderRadius: 8, flexDirection: 'row', justifyContent: 'space-around' }, stat_value: { fontSize: 23, fontWeight: '800', textAlign: 'center' }, stat_label: { marginTop: 3, fontSize: 11, textAlign: 'center' }, section_title: { marginTop: 9, marginBottom: 14, fontSize: 19, fontWeight: '700' }, poster_wrap: { alignItems: 'center', marginBottom: 8 }, muted: { fontSize: 13, lineHeight: 20 }, highlight: { marginBottom: 10, padding: 16, borderWidth: 1, borderRadius: 8, flexDirection: 'row', gap: 12 }, number: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' }, number_text: { fontWeight: '800' }, highlight_copy: { flex: 1, gap: 4, minWidth: 0 }, highlight_title: { fontSize: 15, fontWeight: '700' }, suggestion: { marginBottom: 10, flexDirection: 'row', gap: 8, alignItems: 'flex-start' }, suggestion_text: { flex: 1, fontSize: 14, lineHeight: 21 }, share: { minHeight: 50, marginTop: 18, borderRadius: 8, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }, share_text: { fontSize: 15, fontWeight: '700' }, error_row: { flexDirection: 'row', gap: 8, alignItems: 'center', marginTop: 10 }, error: { flex: 1, color: '#A23C3C', fontSize: 12 }, retry: { fontWeight: '700' } });

@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, SetStateAction, useContext, useEffect, useMemo, useState } from 'react';
 import workspace from '../mocks/workspace.json';
-import { sync_plan_notifications } from '../services/notificationService';
+import { sync_plan_notifications, type NotificationSyncResult } from '../services/notificationService';
+import { plan_identity } from '../domain/planning';
 import { dark_colors, light_colors, ThemeColors } from '../theme';
 import { local_date_key } from '../utils/date';
 
@@ -137,6 +138,7 @@ type ContextValue = {
   data: Workspace;
   colors: ThemeColors;
   ready: boolean;
+  notification_state: 'loading' | 'ready' | 'denied';
   update: (data: SetStateAction<Workspace>) => void;
   add_task: (task_name: string, task_date?: string) => void;
   toggle_task: (task_id: string) => void;
@@ -154,6 +156,7 @@ const WorkspaceContext = createContext<ContextValue | null>(null);
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<Workspace>(default_workspace);
   const [ready, setReady] = useState(false);
+  const [notification_state, setNotificationState] = useState<'loading' | 'ready' | 'denied'>('loading');
 
   useEffect(() => {
     let active = true;
@@ -183,12 +186,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    void sync_plan_notifications(data.plans);
+    let active = true;
+    setNotificationState('loading');
+    void sync_plan_notifications(data.plans).then((result: NotificationSyncResult) => {
+      if (active) setNotificationState(result.enabled ? 'ready' : 'denied');
+    });
+    return () => {
+      active = false;
+    };
   }, [data.plans, ready]);
 
   const value = useMemo<ContextValue>(() => ({
     data,
     ready,
+    notification_state,
     colors: data.theme === 'dark' ? dark_colors : light_colors,
     update: setData,
     add_task: (task_name, task_date = local_date_key()) => {
@@ -196,10 +207,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (!normalized_name) return;
       setData((current) => ({
         ...current,
-        tasks: [
-          ...current.tasks,
-          { task_id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, task_name: normalized_name, completed: false, task_date },
-        ],
+        tasks: current.tasks.some((task) => task.task_date === task_date && task.task_name.trim().toLocaleLowerCase() === normalized_name.toLocaleLowerCase())
+          ? current.tasks
+          : [...current.tasks, { task_id: `task_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, task_name: normalized_name, completed: false, task_date }],
       }));
     },
     toggle_task: (task_id) => setData((current) => ({
@@ -219,7 +229,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setData((current) => {
         const next = [...current.plans];
         for (const item of items) {
-          const duplicate = next.some((plan) => plan.plan_date === plan_date && plan.task_name === item.task_name && plan.start_time === item.start_time);
+          const duplicate = next.some((plan) => plan_identity(plan, plan.plan_date) === plan_identity({ ...item }, plan_date));
           if (!duplicate) {
             next.push({ ...item, plan_id: `plan_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, plan_date, completed: false });
           }
@@ -234,7 +244,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       theme: current.theme === 'light' ? 'dark' : 'light',
     })),
     reset: () => setData(default_workspace),
-  }), [data, ready]);
+  }), [data, notification_state, ready]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }

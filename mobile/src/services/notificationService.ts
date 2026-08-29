@@ -31,7 +31,7 @@ async function cancel_previous_notifications(): Promise<void> {
   }
 }
 
-export async function sync_plan_notifications(plans: DailyPlan[]): Promise<NotificationSyncResult> {
+async function sync_plan_notifications_impl(plans: DailyPlan[]): Promise<NotificationSyncResult> {
   if (Platform.OS === 'web') return { scheduled: 0, enabled: false };
   try {
     await cancel_previous_notifications();
@@ -75,4 +75,15 @@ export async function sync_plan_notifications(plans: DailyPlan[]): Promise<Notif
   } catch {
     return { scheduled: 0, enabled: false };
   }
+}
+
+// State changes can arrive from both the workspace and a screen transition.
+// Serialize the native cancel/schedule pair so an older sync cannot erase a
+// newer set of reminders halfway through its update.
+let notification_queue: Promise<void> = Promise.resolve();
+
+export function sync_plan_notifications(plans: DailyPlan[]): Promise<NotificationSyncResult> {
+  const operation = notification_queue.then(() => sync_plan_notifications_impl(plans));
+  notification_queue = operation.then(() => undefined, () => undefined);
+  return operation;
 }

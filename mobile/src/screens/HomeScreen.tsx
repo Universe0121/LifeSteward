@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { api_client, type WeeklyReportRecord } from '../api';
 import WeeklyPosterCard from '../components/WeeklyPosterCard';
 import { useAuth } from '../state/AuthContext';
@@ -11,7 +11,7 @@ import { format_date_label, local_date_key, weekday_label } from '../utils/date'
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const { user_id, display_name } = useAuth();
-  const { data, colors, toggle_task: toggle_workspace_task, remove_task } = useWorkspace();
+  const { data, colors, toggle_task: toggle_workspace_task } = useWorkspace();
   const today = local_date_key();
   const [reports, setReports] = useState<WeeklyReportRecord[]>([]);
   const [report_loading, setReportLoading] = useState(true);
@@ -53,16 +53,6 @@ export default function HomeScreen() {
 
   function open_stack(screen: string, params?: object) {
     navigation.getParent()?.navigate(screen, params);
-  }
-
-  function open_task_menu(task_id: string) {
-    const task = today_tasks.find((item) => item.task_id === task_id);
-    if (!task) return;
-    Alert.alert(task.task_name, '选择要进行的操作', [
-      { text: '编辑', onPress: () => open_stack('任务管理', { edit_task_id: task.task_id }) },
-      { text: '删除', style: 'destructive', onPress: () => remove_task(task.task_id) },
-      { text: '取消', style: 'cancel' },
-    ]);
   }
 
   function open_report(report: WeeklyReportRecord) {
@@ -139,7 +129,6 @@ export default function HomeScreen() {
             <View key={task.task_id} style={[styles.task_row, { backgroundColor: colors.paper }]}>
               <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: task.completed }} accessibilityLabel={`标记${task.task_name}`} onPress={() => toggle_task(task.task_id)} style={[styles.checkbox, { borderColor: colors.line }, task.completed && { backgroundColor: colors.ink, borderColor: colors.ink }]}>{task.completed && <MaterialCommunityIcons color={colors.paper} name="check" size={18} />}</Pressable>
               <Text style={[styles.task_text, { color: task.completed ? colors.muted : colors.ink }, task.completed && styles.completed_text]}>{task.task_name}</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel={`编辑或删除${task.task_name}`} onPress={() => open_task_menu(task.task_id)} hitSlop={8} style={styles.task_menu}><MaterialCommunityIcons color={colors.ink} name="dots-horizontal" size={21} /></Pressable>
             </View>
           ))}
       </View>
@@ -193,7 +182,6 @@ const styles = StyleSheet.create({
   task_row: { minHeight: 58, padding: 14, borderRadius: 17, flexDirection: 'row', alignItems: 'center', gap: 12 },
   checkbox: { width: 28, height: 28, borderWidth: 2, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   task_text: { flex: 1, minWidth: 0, fontSize: 14 },
-  task_menu: { width: 28, height: 30, alignItems: 'center', justifyContent: 'center' },
   task_heading_actions: { flexDirection: 'row', alignItems: 'center', gap: 13 },
   completed_text: { textDecorationLine: 'line-through' },
   empty_task: { minHeight: 58, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },

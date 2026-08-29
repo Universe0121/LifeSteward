@@ -3,10 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   generateWeeklyReport,
   getWeeklyReports,
+  getWeeklyPosterUrl,
   type WeeklyReportRecord,
 } from "../api";
-
-const default_user_id = "10001";
+import { useAuth } from "../auth";
 
 function reportTitle(report: WeeklyReportRecord): string {
   const overview = report.report_data.overview;
@@ -22,13 +22,14 @@ function reportDate(report: WeeklyReportRecord): string {
 }
 
 export default function WeeklyReport() {
-  const [user_id, setUserId] = useState(default_user_id);
+  const { user_id } = useAuth();
   const [week_start, setWeekStart] = useState("");
   const [reports, setReports] = useState<WeeklyReportRecord[]>([]);
   const [selected_id, setSelectedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
+  const [poster_error, setPosterError] = useState("");
   const [reload_token, setReloadToken] = useState(0);
 
   useEffect(() => {
@@ -39,7 +40,7 @@ export default function WeeklyReport() {
       .then((response) => {
         if (cancelled) return;
         setReports(response.items);
-        setSelectedId((current) => current ?? response.items[0]?.report_id ?? null);
+        setSelectedId((current) => response.items.some((report) => report.report_id === current) ? current : response.items[0]?.report_id ?? null);
       })
       .catch(() => {
         if (!cancelled) setError("周报加载失败，请确认后端服务和数据库已启动。");
@@ -56,26 +57,30 @@ export default function WeeklyReport() {
     () => reports.find((report) => report.report_id === selected_id) ?? reports[0] ?? null,
     [reports, selected_id],
   );
+  const selected_poster_url = selected_report ? getWeeklyPosterUrl(selected_report) : "";
+  const selected_report_data = selected_report?.report_data ?? {};
+  const overview = selected_report_data.overview && typeof selected_report_data.overview === "object"
+    ? selected_report_data.overview as Record<string, unknown>
+    : {};
+  const highlights = Array.isArray(selected_report_data.highlights) ? selected_report_data.highlights : [];
+  const suggestions = Array.isArray(selected_report_data.next_week_suggestions)
+    ? selected_report_data.next_week_suggestions
+    : Array.isArray(selected_report_data.suggestions) ? selected_report_data.suggestions : [];
 
   async function handleGenerate() {
-    if (!user_id.trim() || generating) return;
+    if (!String(user_id).trim() || generating) return;
     setGenerating(true);
     setError("");
     try {
-      const generated = await generateWeeklyReport(user_id.trim(), week_start || undefined);
+      const generated = await generateWeeklyReport(user_id, week_start || undefined);
       setReports((current) => [generated, ...current.filter((report) => report.report_id !== generated.report_id)]);
       setSelectedId(generated.report_id);
+      setPosterError("");
     } catch {
       setError("周报生成失败，请检查数据库连接和模型配置。");
     } finally {
       setGenerating(false);
     }
-  }
-
-  function handleUserChange(value: string) {
-    setUserId(value);
-    setReports([]);
-    setSelectedId(null);
   }
 
   return (
@@ -98,16 +103,13 @@ export default function WeeklyReport() {
         </div>
         <p>根据已记录的生活事件，整理活动占比、完成事项和下周建议。</p>
         <div className="weekly-form-row">
-          <label>
-            用户 ID
-            <input value={user_id} onChange={(event) => handleUserChange(event.target.value)} inputMode="numeric" />
-          </label>
+          <div className="weekly-current-user"><span>当前用户</span><strong>{user_id}</strong></div>
           <label>
             周起始日
             <input type="date" value={week_start} onChange={(event) => setWeekStart(event.target.value)} />
           </label>
         </div>
-        <button className="weekly-generate-button" type="button" onClick={handleGenerate} disabled={generating || !user_id.trim()}>
+        <button className="weekly-generate-button" type="button" onClick={handleGenerate} disabled={generating}>
           {generating ? "正在生成…" : "生成周报"}
           <span aria-hidden="true">→</span>
         </button>
@@ -123,7 +125,7 @@ export default function WeeklyReport() {
       {!loading && reports.length > 0 && (
         <div className="weekly-report-list">
           {reports.map((report) => (
-            <button className={`weekly-report-row${selected_report?.report_id === report.report_id ? " selected" : ""}`} type="button" key={report.report_id} onClick={() => setSelectedId(report.report_id)}>
+            <button className={`weekly-report-row${selected_report?.report_id === report.report_id ? " selected" : ""}`} type="button" key={report.report_id} onClick={() => { setSelectedId(report.report_id); setPosterError(""); }}>
               <span className="weekly-row-index">{String(report.report_id).padStart(2, "0")}</span>
               <span className="weekly-row-copy"><strong>{reportTitle(report)}</strong><small>{reportDate(report)}</small></span>
               <span className="weekly-row-arrow" aria-hidden="true">→</span>
@@ -141,10 +143,16 @@ export default function WeeklyReport() {
               <span className="eyebrow">{reportDate(selected_report)}</span>
               <h2>{reportTitle(selected_report)}</h2>
             </div>
-            <a href={selected_report.poster_url} target="_blank" rel="noreferrer">打开海报 ↗</a>
+            <a href={selected_poster_url} target="_blank" rel="noreferrer">打开海报 ↗</a>
           </div>
-          <div className="weekly-poster-frame">
-            <img src={selected_report.poster_url} alt={`${reportTitle(selected_report)} 海报`} />
+          {poster_error ? <div className="weekly-poster-error" role="alert">{poster_error}<button type="button" onClick={() => { setPosterError(""); setReloadToken((value) => value + 1); }}>重试</button></div> : <div className="weekly-poster-frame">
+            <img src={`${selected_poster_url}${selected_poster_url.includes("?") ? "&" : "?"}preview=1`} alt={`${reportTitle(selected_report)} 海报`} onError={() => setPosterError("海报暂时无法加载，请稍后重试。")} />
+          </div>}
+          <div className="weekly-report-details">
+            <h3>本周摘要</h3>
+            <p>{typeof overview.summary === "string" && overview.summary.trim() ? overview.summary : "这一周的生活，值得被好好看见。"}</p>
+            {highlights.length > 0 && <><h3>生活高光</h3><ul>{highlights.slice(0, 5).map((item, index) => { const value = item && typeof item === "object" ? item as Record<string, unknown> : {}; return <li key={index}><strong>{typeof value.title === "string" ? value.title : "生活片段"}</strong>{typeof value.summary === "string" && `：${value.summary}`}</li>; })}</ul></>}
+            {suggestions.length > 0 && <><h3>下周建议</h3><ul>{suggestions.slice(0, 5).map((item, index) => <li key={index}>{String(item)}</li>)}</ul></>}
           </div>
         </section>
       )}

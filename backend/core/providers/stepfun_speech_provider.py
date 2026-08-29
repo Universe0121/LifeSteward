@@ -16,7 +16,7 @@ class SpeechProviderError(RuntimeError):
     """Raised when the external transcription service cannot be used."""
 
 
-SUPPORTED_AUDIO_FORMATS = frozenset({"ogg", "mp3", "wav", "pcm", "m4a"})
+SUPPORTED_AUDIO_FORMATS = frozenset({"ogg", "mp3", "wav", "pcm", "m4a", "webm"})
 _EXTENSION_FORMATS = {
     "ogg": "ogg",
     "oga": "ogg",
@@ -26,6 +26,7 @@ _EXTENSION_FORMATS = {
     "pcm": "pcm",
     "raw": "pcm",
     "m4a": "m4a",
+    "webm": "webm",
 }
 _CONTENT_TYPE_FORMATS = {
     "audio/ogg": "ogg",
@@ -39,6 +40,8 @@ _CONTENT_TYPE_FORMATS = {
     "audio/l16": "pcm",
     "audio/mp4": "m4a",
     "audio/m4a": "m4a",
+    "audio/webm": "webm",
+    "video/webm": "webm",
 }
 
 
