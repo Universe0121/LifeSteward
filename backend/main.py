@@ -40,6 +40,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -111,7 +112,12 @@ async def speech_to_text(
             language,
         )
     except SpeechServiceError as exc:
-        return _error_response(status.HTTP_503_SERVICE_UNAVAILABLE, exc.error_code, exc.message)
+        error_status = (
+            status.HTTP_400_BAD_REQUEST
+            if exc.error_code in {"AUDIO_EMPTY", "AUDIO_TOO_LARGE", "INVALID_AUDIO"}
+            else status.HTTP_503_SERVICE_UNAVAILABLE
+        )
+        return _error_response(error_status, exc.error_code, exc.message)
     return SpeechTranscriptionResponse(
         text=result.text,
         language=result.language,

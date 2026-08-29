@@ -121,7 +121,7 @@ def create_llm_service_from_environment() -> LLMService:
     }
     generator = QwenProvider(
         api_key=os.getenv("STEP_API_KEY", "") if provider == "stepfun" else os.getenv("DASHSCOPE_API_KEY", ""),
-        model_name=model_name or ("step-3.7-flash" if provider == "stepfun" else "qwen-plus"),
+        model_name=model_name or ("step-3.7-flash" if provider == "stepfun" else "qwen3.8-max"),
         base_url=os.getenv(
             "STEP_BASE_URL" if provider == "stepfun" else "DASHSCOPE_BASE_URL",
             "https://api.stepfun.com/step_plan/v1" if provider == "stepfun" else DASHSCOPE_COMPATIBLE_BASE_URL,

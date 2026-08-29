@@ -10,7 +10,11 @@
       "supportsTablet": true,
       "infoPlist": { "NSMicrophoneUsageDescription": "LifeAgent 需要麦克风将你的语音转成文字。" }
     },
-    "android": { "package": "com.lifeagent.mobile", "permissions": ["RECORD_AUDIO"] },
-    "plugins": ["expo-av"]
+    "android": {
+      "package": "com.lifeagent.mobile",
+      "permissions": ["RECORD_AUDIO"],
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "plugins": ["expo-av", "expo-notifications"]
   }
 }

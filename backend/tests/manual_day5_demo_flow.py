@@ -15,17 +15,22 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 from urllib import error, request
 
 from dotenv import load_dotenv
+
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 from core.database import DatabaseClient
 from core.llm_service import create_llm_service_from_environment
 from tools.vector_search_tool import VectorSearchTool
 
 
-BACKEND_DIR = Path(__file__).resolve().parents[1]
 DEMO_USER_ID = "10001"
 DEMO_CONVERSATION_ID = "day5_demo_10001"
 DEMO_MESSAGES = [

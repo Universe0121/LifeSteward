@@ -17,7 +17,7 @@ class QwenProvider(LLMService):
     def __init__(
         self,
         api_key: str,
-        model_name: str = "qwen-plus",
+        model_name: str = "qwen3.8-max",
         base_url: str = DASHSCOPE_COMPATIBLE_BASE_URL,
         temperature: float = 0.7,
         client: Any | None = None,

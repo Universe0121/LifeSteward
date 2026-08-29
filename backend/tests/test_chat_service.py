@@ -65,6 +65,27 @@ class ChatServiceTestCase(unittest.TestCase):
         self.assertEqual(agent_state["user_input"], "今天学习数学2小时")
         self.assertEqual(agent_state["extracted_events"], [])
 
+    def test_build_agent_state_preserves_conversation_history(self) -> None:
+        request = ChatRequest(
+            user_id=10001,
+            conversation_id="conv001",
+            user_input="继续",
+            conversation_history=[
+                {"role": "user", "content": "我今天很累"},
+                {"role": "assistant", "content": "我听到了"},
+            ],
+        )
+
+        agent_state = build_agent_state(request)
+
+        self.assertEqual(
+            agent_state["conversation_history"],
+            [
+                {"role": "user", "content": "我今天很累"},
+                {"role": "assistant", "content": "我听到了"},
+            ],
+        )
+
     def test_process_chat_message_returns_chat_response(self) -> None:
         stub_master_agent = StubMasterAgent(
             {

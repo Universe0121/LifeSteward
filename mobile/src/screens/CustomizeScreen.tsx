@@ -1,6 +1,92 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useWorkspace } from '../state/WorkspaceContext';
-export default function CustomizeScreen() { const { data, colors, update, toggle_theme } = useWorkspace(); const [new_task, setNewTask] = useState(''); const [saved, setSaved] = useState(false); function add_task() { const name = new_task.trim(); if (!name) return; update({ ...data, tasks: [...data.tasks, { task_id: `task_${Date.now()}`, task_name: name, completed: false }] }); setNewTask(''); } function save() { setSaved(true); setTimeout(() => setSaved(false), 1600); } return <ScrollView contentContainerStyle={[styles.content, { backgroundColor: colors.canvas }]}><View style={styles.heading}><View><Text style={[styles.eyebrow, { color: colors.muted }]}>工作区设置</Text><Text style={[styles.title, { color: colors.ink }]}>自主 DIY</Text></View><View style={[styles.theme_orb, { backgroundColor: colors.ink }]} /></View><Text style={[styles.description, { color: colors.muted }]}>调整你的项目内容与视觉风格，保存后首页会即时应用。</Text><View style={[styles.card, { backgroundColor: colors.paper, borderColor: colors.line }]}><View style={[styles.card_icon, { backgroundColor: colors.blue }]}><MaterialCommunityIcons color={colors.ink} name="view-dashboard-outline" size={20} /></View><Text style={[styles.card_title, { color: colors.ink }]}>项目内容</Text><Text style={[styles.card_copy, { color: colors.muted }]}>编辑卡片上展示的文字</Text><Text style={[styles.label, { color: colors.muted }]}>项目名称</Text><TextInput value={data.project_name} onChangeText={(value) => update({ ...data, project_name: value })} style={[styles.input, { color: colors.ink, borderColor: colors.line, backgroundColor: colors.canvas }]} /><Text style={[styles.label, { color: colors.muted }]}>一句话描述</Text><TextInput multiline value={data.project_description} onChangeText={(value) => update({ ...data, project_description: value })} style={[styles.input, styles.textarea, { color: colors.ink, borderColor: colors.line, backgroundColor: colors.canvas }]} /></View><View style={[styles.card, { backgroundColor: colors.paper, borderColor: colors.line }]}><View style={[styles.card_icon, { backgroundColor: colors.blue }]}><MaterialCommunityIcons color={colors.ink} name="format-list-checks" size={20} /></View><Text style={[styles.card_title, { color: colors.ink }]}>新增任务</Text><Text style={[styles.card_copy, { color: colors.muted }]}>快速添加一条待办事项</Text><View style={styles.add_row}><TextInput value={new_task} onChangeText={setNewTask} placeholder="例如：整理客户反馈" placeholderTextColor={colors.muted} style={[styles.input, styles.add_input, { color: colors.ink, borderColor: colors.line, backgroundColor: colors.canvas }]} /><Pressable accessibilityRole="button" onPress={add_task} style={[styles.add_button, { backgroundColor: colors.ink }]}><Text style={{ color: colors.paper, fontWeight: '700' }}>添加</Text></Pressable></View><View style={styles.editable_list}>{data.tasks.map((task) => <View key={task.task_id} style={styles.editable}><Pressable accessibilityRole="button" accessibilityLabel={`切换${task.task_name}完成状态`} onPress={() => update({ ...data, tasks: data.tasks.map((item) => item.task_id === task.task_id ? { ...item, completed: !item.completed } : item) })} style={[styles.small_button, { backgroundColor: colors.blue }]}><MaterialCommunityIcons color={colors.ink} name={task.completed ? 'check' : 'circle-outline'} size={16} /></Pressable><Text style={[styles.editable_text, { color: task.completed ? colors.muted : colors.ink }, task.completed && styles.strike]}>{task.task_name}</Text><Pressable accessibilityRole="button" accessibilityLabel={`删除${task.task_name}`} onPress={() => update({ ...data, tasks: data.tasks.filter((item) => item.task_id !== task.task_id) })}><MaterialCommunityIcons color={colors.muted} name="close" size={19} /></Pressable></View>)}</View></View><View style={[styles.card, { backgroundColor: colors.paper, borderColor: colors.line }]}><View style={[styles.card_icon, { backgroundColor: colors.blue }]}><MaterialCommunityIcons color={colors.ink} name="theme-light-dark" size={20} /></View><Text style={[styles.card_title, { color: colors.ink }]}>视觉偏好</Text><Text style={[styles.card_copy, { color: colors.muted }]}>选择最适合你的主题</Text><View style={styles.theme_options}><Pressable onPress={() => data.theme !== 'light' && toggle_theme()} style={[styles.theme_option, { borderColor: data.theme === 'light' ? colors.ink : colors.line }]}><View style={[styles.preview, { backgroundColor: '#F8F8F6' }]} /><Text style={{ color: colors.ink }}>浅色</Text></Pressable><Pressable onPress={() => data.theme !== 'dark' && toggle_theme()} style={[styles.theme_option, { borderColor: data.theme === 'dark' ? colors.ink : colors.line }]}><View style={[styles.preview, { backgroundColor: '#252525' }]} /><Text style={{ color: colors.ink }}>深色</Text></Pressable></View></View><Pressable accessibilityRole="button" onPress={save} style={[styles.save, { backgroundColor: colors.ink }]}><Text style={{ color: colors.paper, fontWeight: '700' }}>{saved ? '已保存' : '保存设置'}</Text></Pressable></ScrollView>; }
-const styles = StyleSheet.create({ content: { flexGrow: 1, paddingBottom: 32 }, heading: { paddingHorizontal: 24, paddingTop: 32, paddingBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }, eyebrow: { fontSize: 11, letterSpacing: 0.6, marginBottom: 4 }, title: { fontSize: 26, fontWeight: '700' }, theme_orb: { width: 40, height: 40, borderRadius: 20 }, description: { marginHorizontal: 24, marginBottom: 20, fontSize: 13, lineHeight: 21 }, card: { marginHorizontal: 24, marginBottom: 14, padding: 19, borderWidth: 1, borderRadius: 23 }, card_icon: { width: 38, height: 38, marginBottom: 10, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }, card_title: { fontSize: 16, fontWeight: '700' }, card_copy: { marginTop: 4, marginBottom: 15, fontSize: 12 }, label: { marginTop: 12, fontSize: 12 }, input: { width: '100%', minHeight: 45, marginTop: 7, paddingHorizontal: 13, paddingVertical: 11, borderWidth: 1, borderRadius: 13, fontSize: 13 }, textarea: { minHeight: 75, textAlignVertical: 'top' }, add_row: { flexDirection: 'row', gap: 8 }, add_input: { flex: 1, minWidth: 0, marginTop: 0 }, add_button: { paddingHorizontal: 16, borderRadius: 13, alignItems: 'center', justifyContent: 'center' }, editable_list: { gap: 7, marginTop: 14 }, editable: { minHeight: 28, flexDirection: 'row', alignItems: 'center', gap: 9 }, small_button: { width: 25, height: 25, borderRadius: 7, alignItems: 'center', justifyContent: 'center' }, editable_text: { flex: 1, fontSize: 13 }, strike: { textDecorationLine: 'line-through' }, theme_options: { flexDirection: 'row', gap: 10 }, theme_option: { flex: 1, padding: 10, borderWidth: 1, borderRadius: 14, alignItems: 'center', gap: 6 }, preview: { width: '100%', height: 30, borderRadius: 8 }, save: { minHeight: 50, marginHorizontal: 24, marginTop: 6, borderRadius: 13, alignItems: 'center', justifyContent: 'center' } });
+
+export default function CustomizeScreen() {
+  const { data, colors, update, add_task: add_workspace_task, remove_task, toggle_theme } = useWorkspace();
+  const [new_task, setNewTask] = useState('');
+  const [saved, setSaved] = useState(false);
+  const saved_timer_ref = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (saved_timer_ref.current) clearTimeout(saved_timer_ref.current);
+  }, []);
+
+  function add_task() {
+    const task_name = new_task.trim();
+    if (!task_name) return;
+    add_workspace_task(task_name);
+    setNewTask('');
+  }
+
+  function save_settings() {
+    setSaved(true);
+    if (saved_timer_ref.current) clearTimeout(saved_timer_ref.current);
+    saved_timer_ref.current = setTimeout(() => setSaved(false), 1600);
+  }
+
+  return (
+    <ScrollView style={{ backgroundColor: colors.canvas }} contentContainerStyle={[styles.content, { backgroundColor: colors.canvas }]} keyboardShouldPersistTaps="handled">
+      <View style={styles.heading}><View><Text style={[styles.eyebrow, { color: colors.muted }]}>工作区设置</Text><Text style={[styles.title, { color: colors.ink }]}>自主 DIY</Text></View></View>
+      <Text style={[styles.description, { color: colors.muted }]}>调整你的项目内容与视觉风格，保存后首页会即时应用。</Text>
+
+      <View style={[styles.card, { backgroundColor: colors.paper, borderColor: colors.line }]}>
+        <View style={[styles.card_icon, { backgroundColor: colors.blue }]}><MaterialCommunityIcons color={colors.ink} name="view-dashboard-outline" size={20} /></View>
+        <Text style={[styles.card_title, { color: colors.ink }]}>项目内容</Text>
+        <Text style={[styles.card_copy, { color: colors.muted }]}>编辑卡片上展示的文字</Text>
+        <Text style={[styles.label, { color: colors.muted }]}>项目名称</Text>
+        <TextInput accessibilityLabel="项目名称" value={data.project_name} onChangeText={(value) => update({ ...data, project_name: value })} style={[styles.input, { color: colors.ink, borderColor: colors.line, backgroundColor: colors.canvas }]} />
+        <Text style={[styles.label, { color: colors.muted }]}>一句话描述</Text>
+        <TextInput accessibilityLabel="项目描述" multiline value={data.project_description} onChangeText={(value) => update({ ...data, project_description: value })} style={[styles.input, styles.textarea, { color: colors.ink, borderColor: colors.line, backgroundColor: colors.canvas }]} />
+      </View>
+
+      <View style={[styles.card, { backgroundColor: colors.paper, borderColor: colors.line }]}>
+        <View style={[styles.card_icon, { backgroundColor: colors.blue }]}><MaterialCommunityIcons color={colors.ink} name="format-list-checks" size={20} /></View>
+        <Text style={[styles.card_title, { color: colors.ink }]}>新增任务</Text>
+        <Text style={[styles.card_copy, { color: colors.muted }]}>快速添加一条待办事项</Text>
+        <View style={styles.add_row}><TextInput accessibilityLabel="新任务" value={new_task} onChangeText={setNewTask} onSubmitEditing={add_task} placeholder="例如：整理客户反馈" placeholderTextColor={colors.muted} style={[styles.input, styles.add_input, { color: colors.ink, borderColor: colors.line, backgroundColor: colors.canvas }]} /><Pressable accessibilityRole="button" accessibilityLabel="添加任务" onPress={add_task} disabled={!new_task.trim()} style={[styles.add_button, { backgroundColor: colors.ink }, !new_task.trim() && styles.disabled]}><MaterialCommunityIcons color={colors.paper} name="plus" size={18} /><Text style={{ color: colors.paper, fontWeight: '700' }}>添加</Text></Pressable></View>
+        <View style={styles.editable_list}>{data.tasks.map((task) => <View key={task.task_id} style={styles.editable}><Pressable accessibilityRole="button" accessibilityLabel={`切换${task.task_name}完成状态`} onPress={() => update((current) => ({ ...current, tasks: current.tasks.map((item) => item.task_id === task.task_id ? { ...item, completed: !item.completed } : item) }))} style={[styles.small_button, { backgroundColor: colors.blue }]}><MaterialCommunityIcons color={colors.ink} name={task.completed ? 'check' : 'circle-outline'} size={16} /></Pressable><Text style={[styles.editable_text, { color: task.completed ? colors.muted : colors.ink }, task.completed && styles.strike]}>{task.task_name}</Text><Pressable accessibilityRole="button" accessibilityLabel={`删除${task.task_name}`} onPress={() => remove_task(task.task_id)} hitSlop={8}><MaterialCommunityIcons color={colors.muted} name="close" size={19} /></Pressable></View>)}</View>
+      </View>
+
+      <View style={[styles.card, { backgroundColor: colors.paper, borderColor: colors.line }]}>
+        <View style={[styles.card_icon, { backgroundColor: colors.blue }]}><MaterialCommunityIcons color={colors.ink} name="theme-light-dark" size={20} /></View>
+        <Text style={[styles.card_title, { color: colors.ink }]}>视觉偏好</Text>
+        <Text style={[styles.card_copy, { color: colors.muted }]}>选择最适合你的主题</Text>
+        <View style={styles.theme_options}>
+          <Pressable accessibilityRole="button" accessibilityState={{ selected: data.theme === 'light' }} onPress={() => data.theme !== 'light' && toggle_theme()} style={[styles.theme_option, { borderColor: data.theme === 'light' ? colors.ink : colors.line }]}><View style={[styles.preview, { backgroundColor: '#F8F8F6' }]} /><Text style={{ color: colors.ink }}>浅色</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityState={{ selected: data.theme === 'dark' }} onPress={() => data.theme !== 'dark' && toggle_theme()} style={[styles.theme_option, { borderColor: data.theme === 'dark' ? colors.ink : colors.line }]}><View style={[styles.preview, { backgroundColor: '#252525' }]} /><Text style={{ color: colors.ink }}>深色</Text></Pressable>
+        </View>
+      </View>
+      <Pressable accessibilityRole="button" accessibilityLabel="保存设置" onPress={save_settings} style={[styles.save, { backgroundColor: colors.ink }]}><Text style={{ color: colors.paper, fontWeight: '700' }}>{saved ? '已保存' : '保存设置'}</Text></Pressable>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  content: { flexGrow: 1, paddingBottom: 32 },
+  heading: { paddingHorizontal: 24, paddingTop: 32, paddingBottom: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  eyebrow: { fontSize: 11, letterSpacing: 0.6, marginBottom: 4 },
+  title: { fontSize: 26, fontWeight: '700' },
+  description: { marginHorizontal: 24, marginBottom: 20, fontSize: 13, lineHeight: 21 },
+  card: { marginHorizontal: 24, marginBottom: 14, padding: 19, borderWidth: 1, borderRadius: 23 },
+  card_icon: { width: 38, height: 38, marginBottom: 10, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  card_title: { fontSize: 16, fontWeight: '700' },
+  card_copy: { marginTop: 4, marginBottom: 15, fontSize: 12 },
+  label: { marginTop: 12, fontSize: 12 },
+  input: { width: '100%', minHeight: 45, marginTop: 7, paddingHorizontal: 13, paddingVertical: 11, borderWidth: 1, borderRadius: 13, fontSize: 13 },
+  textarea: { minHeight: 75, textAlignVertical: 'top' },
+  add_row: { flexDirection: 'row', gap: 8 },
+  add_input: { flex: 1, minWidth: 0, marginTop: 0 },
+  add_button: { minWidth: 72, paddingHorizontal: 12, borderRadius: 13, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 3 },
+  disabled: { opacity: 0.45 },
+  editable_list: { gap: 7, marginTop: 14 },
+  editable: { minHeight: 28, flexDirection: 'row', alignItems: 'center', gap: 9 },
+  small_button: { width: 25, height: 25, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  editable_text: { flex: 1, minWidth: 0, fontSize: 13 },
+  strike: { textDecorationLine: 'line-through' },
+  theme_options: { flexDirection: 'row', gap: 10 },
+  theme_option: { flex: 1, padding: 10, borderWidth: 1, borderRadius: 14, alignItems: 'center', gap: 6 },
+  preview: { width: '100%', height: 30, borderRadius: 8 },
+  save: { minHeight: 50, marginHorizontal: 24, marginTop: 6, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+});

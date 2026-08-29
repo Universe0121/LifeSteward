@@ -1,9 +1,83 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { api_client, type WeeklyReportRecord } from '../api';
-import { light_colors, spacing } from '../theme';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import type { WeeklyReportRecord } from '../api';
+import { useWorkspace } from '../state/WorkspaceContext';
+import { spacing } from '../theme';
+import WeeklyPosterPreview from './WeeklyPosterPreview';
+
 export default function WeeklyPosterCard({ report, on_press }: { report: WeeklyReportRecord; on_press: () => void }) {
+  const { colors } = useWorkspace();
   const summary = report.report_data.overview?.summary ?? report.report_data.summary ?? '这一周的生活，值得被好好看见。';
-  return <Pressable accessibilityRole="button" accessibilityLabel="查看周报详情" onPress={on_press} style={styles.card}><View style={styles.poster}><Image source={{ uri: api_client.getWeeklyPosterUri(report.report_id) }} style={styles.image} resizeMode="cover" /><View style={styles.poster_fallback}><MaterialCommunityIcons color={light_colors.ink} name="chart-box-outline" size={30} /><Text style={styles.fallback_text}>WEEKLY</Text></View></View><View style={styles.copy}><Text style={styles.kicker}>LIFEAGENT WEEKLY</Text><Text style={styles.title}>{report.report_data.overview?.title ?? '本周生活周报'}</Text><Text numberOfLines={2} style={styles.summary}>{summary}</Text><Text style={styles.link}>查看详情  ›</Text></View></Pressable>;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="查看周报详情"
+      onPress={on_press}
+      style={[styles.card, { backgroundColor: colors.paper, borderColor: colors.line }]}
+    >
+      <View style={styles.poster}>
+        <WeeklyPosterPreview
+          height={116}
+          poster_url={report.poster_url}
+          report_id={report.report_id}
+          width={92}
+        />
+      </View>
+      <View style={styles.copy}>
+        <Text style={[styles.kicker, { color: colors.muted }]}>LIFEAGENT WEEKLY</Text>
+        <Text style={[styles.title, { color: colors.ink }]} numberOfLines={2}>{report.report_data.overview?.title ?? '本周生活周报'}</Text>
+        <Text numberOfLines={2} style={[styles.summary, { color: colors.muted }]}>{summary}</Text>
+        <View style={styles.link_row}>
+          <Text style={[styles.link, { color: colors.ink }]}>查看详情</Text>
+          <MaterialCommunityIcons color={colors.ink} name="arrow-right" size={16} />
+        </View>
+      </View>
+    </Pressable>
+  );
 }
-const styles = StyleSheet.create({ card: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.md, padding: spacing.md, borderRadius: 18, backgroundColor: light_colors.paper }, poster: { width: 92, height: 116, borderRadius: 12, overflow: 'hidden', backgroundColor: light_colors.blue, alignItems: 'center', justifyContent: 'center' }, image: { ...StyleSheet.absoluteFillObject }, poster_fallback: { alignItems: 'center', justifyContent: 'center', gap: 3 }, fallback_text: { color: light_colors.ink, fontSize: 9, fontWeight: '800' }, copy: { flex: 1, justifyContent: 'center', gap: 5 }, kicker: { color: light_colors.muted, fontSize: 10, letterSpacing: 1 }, title: { color: light_colors.ink, fontWeight: '800', fontSize: 16 }, summary: { color: light_colors.muted, fontSize: 12, lineHeight: 18 }, link: { color: light_colors.ink, fontSize: 12, fontWeight: '700', marginTop: 2 } });
+
+const styles = StyleSheet.create({
+  card: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderRadius: 18,
+  },
+  poster: {
+    width: 92,
+    height: 116,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  copy: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+    gap: 5,
+  },
+  kicker: {
+    fontSize: 10,
+    letterSpacing: 1,
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  summary: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  link_row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 2,
+  },
+  link: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+});

@@ -39,7 +39,7 @@ def load_settings() -> AppSettings:
         postgres_dsn=os.getenv("POSTGRES_DSN", "").strip(),
         redis_url=os.getenv("REDIS_URL", "").strip(),
         llm_provider=os.getenv("LLM_PROVIDER", "qwen").strip().lower(),
-        model_name=os.getenv("MODEL_NAME", "").strip() or "qwen-plus",
+        model_name=os.getenv("MODEL_NAME", "").strip() or "qwen3.8-max",
         dashscope_api_key=os.getenv("DASHSCOPE_API_KEY", "").strip(),
         dashscope_base_url=os.getenv(
             "DASHSCOPE_BASE_URL",

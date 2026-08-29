@@ -120,6 +120,7 @@ class MasterAgent:
 
     @staticmethod
     def _initialize_state(state: AgentState) -> None:
+        state.setdefault("conversation_history", [])
         state.setdefault("intent", "")
         state.setdefault("extracted_events", [])
         state.setdefault("retrieved_memories", [])
