@@ -29,7 +29,36 @@ export type LifeEventsResponse = {
   count: number;
 };
 
+export type WeeklyReportRecord = {
+  report_id: number;
+  user_id: string;
+  week_start: string;
+  week_end: string;
+  report_data: Record<string, unknown>;
+  poster_url: string;
+  generated_at: string;
+};
+
+export type WeeklyReportsResponse = {
+  items: WeeklyReportRecord[];
+  count: number;
+};
+
 const api_base = import.meta.env.VITE_API_BASE || "/api";
+
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit = {},
+  timeout_ms = 8000,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeout_ms);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
 
 export async function postChat(chat_request: ChatRequest): Promise<ChatResponse> {
   const response = await fetch(`${api_base}/v1/chat`, {
@@ -57,4 +86,39 @@ export async function getLifeEvents(
   }
 
   return response.json() as Promise<LifeEventsResponse>;
+}
+
+export async function getWeeklyReports(
+  user_id: number | string,
+  limit = 10,
+): Promise<WeeklyReportsResponse> {
+  const search = new URLSearchParams({ user_id: String(user_id), limit: String(limit) });
+  const response = await fetchWithTimeout(`${api_base}/v1/weekly-reports?${search}`);
+
+  if (!response.ok) {
+    throw new Error(`weekly reports request failed: ${response.status}`);
+  }
+
+  return response.json() as Promise<WeeklyReportsResponse>;
+}
+
+export async function generateWeeklyReport(
+  user_id: number | string,
+  week_start?: string,
+): Promise<WeeklyReportRecord> {
+  const response = await fetchWithTimeout(`${api_base}/v1/weekly-reports/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_id,
+      ...(week_start ? { week_start } : {}),
+      timezone: "Asia/Shanghai",
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`weekly report generation failed: ${response.status}`);
+  }
+
+  return response.json() as Promise<WeeklyReportRecord>;
 }

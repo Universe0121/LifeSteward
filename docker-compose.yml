@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: lifesteward-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${LIFESTEWARD_POSTGRES_PASSWORD:?Set LIFESTEWARD_POSTGRES_PASSWORD to the password in backend/.env}
+      POSTGRES_DB: lifesteward
+    ports:
+      - "5432:5432"
+    volumes:
+      - lifesteward-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d lifesteward"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    container_name: lifesteward-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - lifesteward-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  lifesteward-postgres-data:
+  lifesteward-redis-data:
