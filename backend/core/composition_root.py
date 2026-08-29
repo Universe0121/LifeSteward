@@ -8,6 +8,8 @@ from core.llm_service import LLMService, configure_llm_service_from_environment
 from services.memory_service import ToolMemoryService
 from tools.sql_tool import SQLTool
 from tools.vector_search_tool import VectorSearchTool
+from core.providers.speech_provider import create_speech_provider_from_environment
+from services.speech_service import SpeechService
 
 
 @dataclass(frozen=True)
@@ -20,6 +22,7 @@ class CompositionRoot:
     vector_search_tool: VectorSearchTool
     memory_service: ToolMemoryService
     master_agent: MasterAgent
+    speech_service: SpeechService
 
 
 def build_composition_root() -> CompositionRoot:
@@ -31,6 +34,7 @@ def build_composition_root() -> CompositionRoot:
     vector_search_tool = VectorSearchTool(database_client)
     memory_service = ToolMemoryService(sql_tool, vector_search_tool, llm_service)
     master_agent = MasterAgent(memory_service=memory_service, llm_service=llm_service)
+    speech_service = SpeechService(create_speech_provider_from_environment())
     return CompositionRoot(
         llm_service,
         database_client,
@@ -38,4 +42,5 @@ def build_composition_root() -> CompositionRoot:
         vector_search_tool,
         memory_service,
         master_agent,
+        speech_service,
     )

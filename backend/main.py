@@ -3,7 +3,7 @@
 import os
 from contextlib import asynccontextmanager
 from datetime import date
-from fastapi import FastAPI, Query, Request, status
+from fastapi import FastAPI, File, Form, Query, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
@@ -15,6 +15,8 @@ from services.chat_service import AgentProcessingError, process_chat_message
 from services.life_event_query_service import LifeEventQueryService
 from services.mock_demo_service import get_demo_agent
 from core.composition_root import CompositionRoot, build_composition_root
+from schemas.speech_schema import SpeechToTextResponse
+from services.speech_service import SpeechServiceError
 
 
 @asynccontextmanager
@@ -90,6 +92,25 @@ def mock_chat(chat_request: ChatRequest) -> ChatResponse:
     return process_chat_message(chat_request, master_agent=get_demo_agent())
 
 
+@app.post("/api/v1/speech-to-text", response_model=SpeechToTextResponse)
+async def speech_to_text(
+    audio: UploadFile = File(...),
+    user_id: int = Form(...),
+    language: str = Form("zh-CN"),
+) -> SpeechToTextResponse:
+    root: CompositionRoot | None = getattr(app.state, "composition_root", None)
+    if root is None or not getattr(root, "speech_service", None):
+        raise SpeechServiceError("TRANSCRIPTION_UNAVAILABLE", "语音转写服务暂时不可用", 503)
+    result = root.speech_service.transcribe(
+        await audio.read(),
+        user_id=user_id,
+        filename=audio.filename or "audio",
+        content_type=audio.content_type or "application/octet-stream",
+        language=language or "zh-CN",
+    )
+    return SpeechToTextResponse(text=result.text, language=result.language, duration_ms=result.duration_ms)
+
+
 @app.get("/api/v1/life-events", response_model=LifeEventsResponse)
 def life_events(
     user_id: str = Query(..., min_length=1),
@@ -151,6 +172,12 @@ async def agent_processing_exception_handler(
         "AGENT_PROCESSING_ERROR",
         str(exc),
     )
+
+
+@app.exception_handler(SpeechServiceError)
+async def speech_service_exception_handler(request: Request, exc: SpeechServiceError) -> JSONResponse:
+    del request
+    return _error_response(exc.status_code, exc.code, str(exc))
 
 
 @app.exception_handler(Exception)

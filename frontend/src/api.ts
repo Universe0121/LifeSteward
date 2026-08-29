@@ -29,6 +29,8 @@ export type LifeEventsResponse = {
   count: number;
 };
 
+export type SpeechToTextResponse = { text: string; language: string; duration_ms: number };
+
 const api_base = import.meta.env.VITE_API_BASE || "/api";
 
 async function requestError(response: Response, request_name: string): Promise<Error> {
@@ -56,6 +58,17 @@ export async function postChat(chat_request: ChatRequest): Promise<ChatResponse>
   }
 
   return response.json() as Promise<ChatResponse>;
+}
+
+export async function postSpeechToText(audio: Blob, user_id: number, language = "zh-CN"): Promise<SpeechToTextResponse> {
+  const form = new FormData();
+  const extension = audio.type.includes("webm") ? "webm" : audio.type.includes("ogg") ? "ogg" : "wav";
+  form.append("audio", audio, `recording.${extension}`);
+  form.append("user_id", String(user_id));
+  form.append("language", language);
+  const response = await fetch(`${api_base}/v1/speech-to-text`, { method: "POST", body: form });
+  if (!response.ok) throw await requestError(response, "speech-to-text");
+  return response.json() as Promise<SpeechToTextResponse>;
 }
 
 export async function getLifeEvents(

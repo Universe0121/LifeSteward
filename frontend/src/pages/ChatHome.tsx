@@ -1,5 +1,7 @@
 import { FormEvent, useState } from "react";
 import { postChat } from "../api";
+import VoiceInputButton from "../components/VoiceInputButton";
+import { useVoiceInput } from "../hooks/useVoiceInput";
 
 type Message = { role: "user" | "assistant"; content: string; time: string };
 type RequestStatus = "idle" | "loading" | "success" | "error";
@@ -57,6 +59,7 @@ export default function ChatHome() {
   const [is_loading, setIsLoading] = useState(false);
   const [conversation_id] = useState(() => getConversationId(sessionStorage, newConversationSeed));
   const [request_details, setRequestDetails] = useState<RequestDetails>(() => emptyRequestDetails("idle"));
+  const voice = useVoiceInput({ user_id: 10001, onText: (text) => setUserInput(text) });
 
   async function sendMessage(raw_content: string, append_user = true) {
     const content = raw_content.trim();
@@ -110,7 +113,8 @@ export default function ChatHome() {
         <dl><div><dt>请求状态</dt><dd>{request_details.status}</dd></div><div><dt>会话 ID</dt><dd>{conversation_id}</dd></div><div><dt>意图</dt><dd>{request_details.intent}</dd></div><div><dt>提取事件</dt><dd>{request_details.extracted_events.length}</dd></div></dl>
         {request_details.extracted_events.length > 0 && <pre>{JSON.stringify(request_details.extracted_events, null, 2)}</pre>}
        </div>
-       <form className="composer" onSubmit={handleSubmit}><input aria-label="用户输入" value={user_input} onChange={(event) => setUserInput(event.target.value)} placeholder="说点什么..." /><button aria-label="发送" type="submit" disabled={is_loading || !user_input.trim()}>↑</button></form>
+       {voice.error && <div className="voice-error" role="alert">{voice.error}</div>}
+       <form className="composer" onSubmit={handleSubmit}><input aria-label="用户输入" value={user_input} onChange={(event) => setUserInput(event.target.value)} placeholder="说点什么..." /><VoiceInputButton state={voice.state} duration_ms={voice.duration_ms} error={voice.error} onStart={() => void voice.start()} onStop={voice.stop} /><button aria-label="发送" type="submit" disabled={is_loading || !user_input.trim()}>↑</button></form>
     </section>
   );
 }
