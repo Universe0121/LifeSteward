@@ -3,9 +3,13 @@
 import os
 from collections.abc import Callable, Mapping
 from pathlib import Path
-
-from dotenv import load_dotenv
 from typing import Any
+
+try:  # pragma: no cover - optional dependency branch
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - handled at runtime
+    def load_dotenv(*args, **kwargs):  # type: ignore[no-redef]
+        return False
 
 
 class LLMError(RuntimeError):

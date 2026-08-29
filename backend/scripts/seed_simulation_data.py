@@ -4,7 +4,12 @@ import argparse, json, os, sys
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib import error, request
-from dotenv import load_dotenv
+
+try:  # pragma: no cover - optional local convenience dependency
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - tests can run without python-dotenv
+    def load_dotenv(*args, **kwargs):
+        return False
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:

@@ -27,6 +27,16 @@ Day3 freezes the persistence layer around PostgreSQL + pgvector.
 - `metadata`: jsonb
 - `created_at`: timestamptz, default `now()`
 
+### `weekly_reports`
+- `report_id`: bigserial primary key
+- `user_id`: text, required
+- `week_start`: date, required
+- `week_end`: date, required
+- `report_data`: jsonb, default `{}`
+- `poster_svg`: text, default `''`
+- `generated_at`: timestamptz, default `now()`
+- unique constraint: `(user_id, week_start)`
+
 ## Supporting tables
 
 - `user_profile`

@@ -29,6 +29,8 @@ class ProductionWiringTest(unittest.TestCase):
             root.master_agent._memory_agent.memory_service,
             root.memory_service,
         )
+        self.assertIs(root.weekly_report_agent._llm_service, llm)
+        self.assertIs(root.weekly_report_service._weekly_report_agent, root.weekly_report_agent)
 
 
 if __name__ == "__main__":

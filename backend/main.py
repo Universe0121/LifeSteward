@@ -1,14 +1,21 @@
 """FastAPI application entry point for the LifeAgent backend."""
 
 from contextlib import asynccontextmanager
+from collections.abc import Mapping
+from typing import Any
 from fastapi import FastAPI, Query, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 
 from schemas.chat_schema import ChatRequest, ChatResponse
 from schemas.error_schema import ErrorResponse
 from schemas.life_event_schema import LifeEventItem, LifeEventsResponse
+from schemas.weekly_report_schema import (
+    WeeklyReportGenerateRequest,
+    WeeklyReportListResponse,
+    WeeklyReportRecord,
+)
 from services.chat_service import AgentProcessingError, process_chat_message
 from services.life_event_query_service import LifeEventQueryService
 from services.mock_demo_service import get_demo_agent
@@ -82,6 +89,60 @@ def life_events(
     )
 
 
+@app.post("/api/v1/weekly-reports/generate", response_model=WeeklyReportRecord)
+def generate_weekly_report(
+    request_payload: WeeklyReportGenerateRequest,
+) -> WeeklyReportRecord:
+    root: CompositionRoot | None = getattr(app.state, "composition_root", None)
+    if root is None:
+        raise RuntimeError("Production composition root is not initialized")
+
+    try:
+        report = root.weekly_report_service.generate_weekly_report(
+            user_id=request_payload.user_id,
+            week_start=request_payload.week_start,
+            timezone_name=request_payload.timezone,
+        )
+    except ValueError as exc:
+        return _error_response(
+            status.HTTP_400_BAD_REQUEST,
+            "INVALID_REQUEST",
+            str(exc),
+        )
+
+    return _weekly_report_record(report)
+
+
+@app.get("/api/v1/weekly-reports", response_model=WeeklyReportListResponse)
+def weekly_reports(
+    user_id: str = Query(..., min_length=1),
+    limit: int = Query(10, ge=1, le=100),
+) -> WeeklyReportListResponse:
+    root: CompositionRoot | None = getattr(app.state, "composition_root", None)
+    if root is None:
+        raise RuntimeError("Production composition root is not initialized")
+    items = root.weekly_report_service.list_weekly_reports(user_id, limit=limit)
+    return WeeklyReportListResponse(
+        items=[_weekly_report_record(item) for item in items],
+        count=len(items),
+    )
+
+
+@app.get("/api/v1/weekly-reports/{report_id}/poster")
+def weekly_report_poster(report_id: int) -> Response:
+    root: CompositionRoot | None = getattr(app.state, "composition_root", None)
+    if root is None:
+        raise RuntimeError("Production composition root is not initialized")
+    poster_svg = root.weekly_report_service.get_weekly_report_poster(report_id)
+    if poster_svg is None:
+        return _error_response(
+            status.HTTP_404_NOT_FOUND,
+            "WEEKLY_REPORT_NOT_FOUND",
+            "周报不存在",
+        )
+    return Response(content=poster_svg, media_type="image/svg+xml")
+
+
 def _error_response(
     status_code: int,
     error_code: str,
@@ -94,6 +155,13 @@ def _error_response(
             error_code=error_code,
             message=message,
         ).model_dump(),
+    )
+
+
+def _weekly_report_record(report: Mapping[str, Any]) -> WeeklyReportRecord:
+    public_fields = set(WeeklyReportRecord.model_fields)
+    return WeeklyReportRecord.model_validate(
+        {key: value for key, value in dict(report).items() if key in public_fields}
     )
 
 

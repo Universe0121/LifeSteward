@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import unittest
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from tools.sql_tool import SQLTool
@@ -71,6 +71,107 @@ class SQLToolTestCase(unittest.TestCase):
         self.assertEqual(tool.get_recent_events("10001", days=0), [])
         self.assertEqual(client.fetch_all_calls, [])
 
+    def test_get_events_in_range_uses_user_id_and_bounds(self) -> None:
+        client = FakeDatabaseClient(fetch_all_result=[{"life_event_id": 1}])
+        tool = SQLTool(database_client=client)
+
+        events = tool.get_events_in_range(
+            " 10001 ",
+            date(2026, 8, 18),
+            "2026-08-25",
+        )
+
+        self.assertEqual(events, [{"life_event_id": 1}])
+        query, params = client.fetch_all_calls[0]
+        self.assertIn("FROM life_events", query)
+        self.assertEqual(params[0], "10001")
+        self.assertIsInstance(params[1], datetime)
+        self.assertIsInstance(params[2], datetime)
+        self.assertEqual(params[1].tzinfo, UTC)
+        self.assertEqual(params[2].tzinfo, UTC)
+
+    def test_get_events_in_range_rejects_invalid_window(self) -> None:
+        tool = SQLTool(database_client=FakeDatabaseClient())
+
+        self.assertEqual(tool.get_events_in_range("10001", "2026-08-25", "2026-08-25"), [])
+
+    def test_list_users_with_events_in_range_returns_distinct_user_ids(self) -> None:
+        client = FakeDatabaseClient(
+            fetch_all_result=[
+                {"user_id": "10001"},
+                {"user_id": " 10001 "},
+                {"user_id": "10002"},
+            ]
+        )
+        tool = SQLTool(database_client=client)
+
+        user_ids = tool.list_users_with_events_in_range(
+            "2026-08-18T00:00:00+08:00",
+            "2026-08-25T00:00:00+08:00",
+        )
+
+        self.assertEqual(user_ids, ["10001", "10002"])
+        query, params = client.fetch_all_calls[0]
+        self.assertIn("SELECT DISTINCT user_id", query)
+        self.assertEqual(params[0], datetime(2026, 8, 17, 16, 0, tzinfo=UTC))
+        self.assertEqual(params[1], datetime(2026, 8, 24, 16, 0, tzinfo=UTC))
+
+    def test_get_weekly_report_uses_user_id_and_week_start(self) -> None:
+        client = FakeDatabaseClient(fetch_one_result={"report_id": 12})
+        tool = SQLTool(database_client=client)
+
+        report = tool.get_weekly_report(" 10001 ", "2026-08-18")
+
+        self.assertEqual(report, {"report_id": 12})
+        query, params = client.fetch_one_calls[0]
+        self.assertIn("FROM weekly_reports", query)
+        self.assertEqual(params[0], "10001")
+        self.assertEqual(params[1], date(2026, 8, 18))
+
+    def test_list_weekly_reports_uses_limit_and_order(self) -> None:
+        client = FakeDatabaseClient(fetch_all_result=[{"report_id": 1}])
+        tool = SQLTool(database_client=client)
+
+        reports = tool.list_weekly_reports("10001", limit=5)
+
+        self.assertEqual(reports, [{"report_id": 1}])
+        query, params = client.fetch_all_calls[0]
+        self.assertIn("ORDER BY week_start DESC", query)
+        self.assertEqual(params, ("10001", 5))
+
+    def test_save_weekly_report_upserts_by_user_id_and_week_start(self) -> None:
+        client = FakeDatabaseClient(fetch_one_result={"report_id": 7})
+        tool = SQLTool(database_client=client)
+
+        report = tool.save_weekly_report(
+            {
+                "user_id": "10001",
+                "week_start": "2026-08-18",
+                "week_end": "2026-08-24",
+                "report_data": {
+                    "summary": "ok",
+                    "highlights": [],
+                    "stats": {"event_count": 3},
+                    "suggestions": [],
+                },
+                "poster_svg": "<svg />",
+            }
+        )
+
+        self.assertEqual(report, {"report_id": 7})
+        query, params = client.fetch_one_calls[0]
+        self.assertIn("ON CONFLICT (user_id, week_start)", query)
+        self.assertEqual(params[0], "10001")
+        self.assertEqual(params[1], date(2026, 8, 18))
+        self.assertEqual(params[2], date(2026, 8, 24))
+        self.assertEqual(json.loads(params[3]), {
+            "summary": "ok",
+            "highlights": [],
+            "stats": {"event_count": 3},
+            "suggestions": [],
+        })
+        self.assertEqual(params[4], "<svg />")
+
     def test_save_life_events_writes_all_rows(self) -> None:
         client = FakeDatabaseClient(fetch_one_result={"id": 1})
         tool = SQLTool(database_client=client)
@@ -135,6 +236,22 @@ class SQLToolTestCase(unittest.TestCase):
         self.assertIn("ON CONFLICT (user_id)", query)
         self.assertEqual(params[0], "10001")
         self.assertEqual(json.loads(params[1]), user_profile)
+
+    def test_get_user_profile_returns_profile_data_or_none(self) -> None:
+        client = FakeDatabaseClient(fetch_one_result={"user_id": "10001", "profile_data": {"learning_style": "short_task"}})
+        tool = SQLTool(database_client=client)
+
+        profile = tool.get_user_profile(" 10001 ")
+
+        self.assertEqual(profile, {"learning_style": "short_task"})
+        query, params = client.fetch_one_calls[0]
+        self.assertIn("FROM user_profile", query)
+        self.assertEqual(params, ("10001",))
+
+    def test_get_user_profile_returns_none_when_missing(self) -> None:
+        tool = SQLTool(database_client=FakeDatabaseClient())
+
+        self.assertIsNone(tool.get_user_profile("10001"))
 
     def test_update_user_profile_updates_existing_user(self) -> None:
         client = FakeDatabaseClient()

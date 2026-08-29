@@ -30,14 +30,16 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
             raise unittest.SkipTest("POSTGRES_DSN is not configured")
 
         cls.database_client = DatabaseClient(cls.postgres_dsn)
-        cls.migration_path = (
-            _BACKEND_DIR / "migrations" / "001_initial_memory_schema.sql"
-        )
+        cls.migration_paths = [
+            _BACKEND_DIR / "migrations" / "001_initial_memory_schema.sql",
+            _BACKEND_DIR / "migrations" / "002_weekly_reports.sql",
+        ]
 
         try:
-            cls.database_client.execute_script(
-                cls.migration_path.read_text(encoding="utf-8")
-            )
+            for migration_path in cls.migration_paths:
+                cls.database_client.execute_script(
+                    migration_path.read_text(encoding="utf-8")
+                )
         except Exception as exc:  # pragma: no cover - environment-dependent
             raise unittest.SkipTest(f"Database migration could not run: {exc}") from exc
 
@@ -57,6 +59,7 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
               AND tablename IN (
                   'life_events',
                   'memories',
+                  'weekly_reports',
                   'user_profile',
                   'goals',
                   'plans',
@@ -73,6 +76,7 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
             {
                 "life_events",
                 "memories",
+                "weekly_reports",
                 "user_profile",
                 "goals",
                 "plans",
@@ -120,6 +124,58 @@ class DatabaseIntegrationTestCase(unittest.TestCase):
         self.assertEqual(events[0]["user_id"], user_id)
         self.assertEqual(events[0]["event_content"], "最近学习效率很差")
         self.assertNotIn(other_user_id, {event["user_id"] for event in events})
+
+    def test_weekly_report_roundtrip(self) -> None:
+        sql_tool = SQLTool(database_client=self.database_client)
+        user_id = "integration-user-weekly"
+
+        first_report = sql_tool.save_weekly_report(
+            {
+                "user_id": user_id,
+                "week_start": "2026-08-18",
+                "week_end": "2026-08-24",
+                "report_data": {
+                    "summary": "first",
+                    "highlights": [],
+                    "stats": {"event_count": 1},
+                    "suggestions": [],
+                },
+                "poster_svg": "<svg>first</svg>",
+            }
+        )
+        second_report = sql_tool.save_weekly_report(
+            {
+                "user_id": user_id,
+                "week_start": "2026-08-18",
+                "week_end": "2026-08-24",
+                "report_data": {
+                    "summary": "second",
+                    "highlights": [],
+                    "stats": {"event_count": 2},
+                    "suggestions": [],
+                },
+                "poster_svg": "<svg>second</svg>",
+            }
+        )
+
+        self.assertIsNotNone(first_report)
+        self.assertIsNotNone(second_report)
+        self.assertEqual(first_report["report_id"], second_report["report_id"])
+
+        row = self.database_client.fetch_one(
+            """
+            SELECT report_id, report_data, poster_svg
+            FROM weekly_reports
+            WHERE user_id = %s
+              AND week_start = %s
+            """,
+            (user_id, "2026-08-18"),
+        )
+
+        self.assertIsNotNone(row)
+        self.assertEqual(row["report_id"], first_report["report_id"])
+        self.assertEqual(row["report_data"]["summary"], "second")
+        self.assertEqual(row["poster_svg"], "<svg>second</svg>")
 
     def test_user_profile_roundtrip(self) -> None:
         sql_tool = SQLTool(database_client=self.database_client)
