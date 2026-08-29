@@ -75,9 +75,9 @@ FastAPI -> SpeechService -> StepFunSpeechProvider
 
 ## 未完成模块
 
--   当前仅完成 Android 模拟器验收，尚未取得实体 Android 手机和 iOS 设备验收结果。
--   本次未配置或执行共享 PostgreSQL 的真实 round-trip；后端测试中的 PostgreSQL、Redis 和显式 E2E 项目仍按环境条件 skip。
--   StepFun 真实网络转写未在本次构建中执行，已提供配置读取和 Fake Provider 测试；真实 key 未进入源码、handoff 或 APK。
+-   已完成 Android 模拟器安装启动验收，尚未取得实体 Android 手机和 iOS 设备验收结果。
+-   本次使用本机 Docker PostgreSQL/pgvector/Redis 完成真实验收；共享云数据库和云端后端部署留待后续阶段。
+-   StepFun 真实网络转写尚未用实体设备录音执行；客户端录音、权限、multipart 上传和后端 Provider 已实现，真实 key 未进入源码、handoff 或 APK。
 
 ------------------------------------------------------------------------
 
@@ -91,7 +91,7 @@ FastAPI -> SpeechService -> StepFunSpeechProvider
 
 问题：Windows 中文路径触发 Android Gradle 路径检查。
 
-解决方案：在 `mobile/android/gradle.properties` 增加 `android.overridePathCheck=true`，并使用 Android Studio JBR、SDK 和 Platform Tools 构建。
+解决方案：保留 `mobile/android/gradle.properties` 的路径兼容配置；因 Ninja 仍解析中文绝对路径，最终从等价的 ASCII 临时构建目录 `D:\LifeStewardMobileBuild` 构建，APK 与仓库源码一致。
 
 问题：`@react-native-async-storage/async-storage` 会引入当前环境未缓存的 Android KSP 依赖。
 
@@ -120,9 +120,9 @@ FastAPI -> SpeechService -> StepFunSpeechProvider
 
 下一步：
 
--   使用真实后端局域网地址配置 `mobile/.env`，通过 APK 验证聊天、时间轴、周报生成和海报分享。
+-   使用云端后端替换临时隧道地址，重新构建生产 APK；临时隧道关闭后当前 APK 的真实接口不可用。
 -   在 Android 真机验证麦克风授权、`.m4a` 录音上传和 StepFun 真实转写。
--   配置 PostgreSQL/pgvector 后补做真实数据库 round-trip 和正式 E2E。
+-   为 Android 发布包配置正式签名 keystore，并在实体设备补做正式 E2E。
 
 优先级：P0 为真实后端和实体 Android 设备验收，P1 为周报/海报异常场景复验。
 
@@ -134,20 +134,28 @@ FastAPI -> SpeechService -> StepFunSpeechProvider
 
 Branch：`codex/feature_day7_expo_mobile_final`
 
-Commit：`96a048c57a87813f80cad12c88664f701c331dda`（移动端和后端语音适配源码提交；后续仅补充本 handoff 文档）。
+Commit：待本次 handoff 提交后填写。
 
-基线：执行时网络无法更新远端引用，使用本地 `origin/main`（`05b5daa`）创建分支；推送前会再次尝试 `git fetch origin`。
+基线：本分支基于 `origin/main` 的现有代码创建；本次未改动 `LifeSteward-main` 下载目录。
 
 Expo：SDK 52，React Native 0.76.9。
 
-Android：Android Studio JBR，Android SDK `D:\Program\Android\sdk`，模拟器 `emulator-5554`。
+Node/npm：Node.js LTS（npm 运行时），依赖由 `mobile/package-lock.json` 锁定。
 
-测试结果：移动端 TypeScript 通过，移动端单元测试 5/5 通过，Expo Doctor 18/18 通过，Expo Web export 成功；后端测试 121 通过、4 个外部环境 skip。
+Android：Android Studio JBR，Android SDK `D:\Program\Android\sdk`，AVD `Medium_Phone_API_36.1`，Android 16。
+
+公网临时联调：后端监听 `0.0.0.0:8000`，临时 HTTPS 地址为 `https://open-pants-teach.loca.lt`；隧道进程关闭后地址失效。该地址只用于本次体验，不是生产部署地址。
+
+测试结果：移动端 `npm run typecheck` 通过，单元测试 5/5 通过；后端数据库集成测试 6/6 通过，完整后端测试 127 通过、1 项因 `LIFE_STEWARD_E2E` 未启用而 skip。Expo Doctor 18/18 和 Expo Web export 已在源码提交时通过。
+
+真实数据库证据：migration 执行成功，pgvector `0.8.6` 可用；七张核心表和 `weekly_reports` 存在。公网聊天 3 次返回 200，Agent 解析并持久化 4 条 `user_id=10001` 事件；对应 4 条 memory 均有 embedding，维度统一为 `1024`。周报生成返回 `report_id=5`，海报返回 `200 image/svg+xml`。
+
+API 配置：`mobile/.env` 仅保存 `EXPO_PUBLIC_API_BASE_URL` 和 `EXPO_PUBLIC_API_MODE=real`；后端真实 PostgreSQL、Redis、LLM、DashScope embedding、StepFun speech 配置只在本机 `backend/.env`，没有提交任何真实密钥。
 
 APK：`D:\Codex\黑客松\mobile\android\app\build\outputs\apk\release\app-release.apk`
 
-APK SHA-256：`0F725FF3075CCEF9E5BB83B05F31392FCA483028F281812BA2851BCF0FD1604A`
+APK SHA-256：`A6985977954985A81995772F4B30CFBA747027CEB1D18698A792DCE97C3748F2`
 
-APK 验收：Release APK 已通过 APK Signature Scheme v2 校验，安装到 `emulator-5554` 成功，独立启动显示首页且 Logcat 无 `FATAL EXCEPTION` 或 React Native JS 崩溃。
+APK 验收：Release APK 由本次公网配置源码构建，bundle 已确认包含临时公网地址；安装到 `Medium_Phone_API_36.1` 成功，独立启动显示与 GitHub 网页端一致的首页，Logcat 无 `FATAL EXCEPTION`、`AndroidRuntime` 或 React Native JS 崩溃。
 
 安全：真实语音 API key 只保留在本机未跟踪配置中，未提交到 GitHub、handoff 或 APK；对话中公开过的 key 完成后应立即轮换。
