@@ -1,7 +1,7 @@
 # LifeAgent 周报总结与海报交接验收
 
 日期：2026-08-29  
-负责人：成员三  
+负责人：邓庥晗 
 交接对象：成员二、前端/移动端调用方
 
 ## 1. 交付范围
@@ -399,24 +399,14 @@ cd D:\生活管家\LifeSteward-main\LifeSteward-main\backend
 .\.venv312\Scripts\python.exe -m unittest discover -s tests -p "test_*.py" -v
 ```
 
-默认未设置 `LIFE_STEWARD_E2E` 时，生产 E2E 会按设计跳过；本次已按验收要求开启环境变量重跑完整回归：
-
-```powershell
-cd D:\生活管家\LifeSteward-main\LifeSteward-main\backend
-$env:LIFE_STEWARD_E2E="1"
-.\.venv312\Scripts\python.exe -m unittest discover -s tests -p "test_*.py" -v
-```
-
-结果：121 tests，全部通过，0 errors，0 failures，0 skipped。
+结果：121 tests，120 通过，0 errors，0 failures，1 skipped。
 
 - 已解决：`tests.test_database_integration.DatabaseIntegrationTestCase.test_vector_search_roundtrip`
   - 原失败点：真实 embedding HTTP 请求阶段，底层为 `WinError 10013`。
   - 复验方式：使用提升权限放开外部 HTTP 后重跑。
   - 复验结果：通过。
-- 已解决：`tests.test_e2e_production_smoke.ProductionChainSmokeTest.test_web_demo_production_chain`
-  - 原状态：默认未设置 `LIFE_STEWARD_E2E` 时跳过。
-  - 复验方式：设置 `$env:LIFE_STEWARD_E2E="1"` 后跑完整回归。
-  - 复验结果：通过，完整回归不再出现 skipped。
+- Skipped：`tests.test_e2e_production_smoke.ProductionChainSmokeTest.test_web_demo_production_chain`
+  - 原因：`LIFE_STEWARD_E2E` 未启用。
 
 生产 E2E 补验：
 
@@ -426,8 +416,8 @@ $env:LIFE_STEWARD_E2E="1"
 .\.venv312\Scripts\python.exe -m unittest tests.test_e2e_production_smoke -v
 ```
 
-结果：1 test，通过；完整回归中也已执行该 E2E，未跳过。  
-证据：`record_intent=record_event`，`database_life_event_id=100`，`life_events_api_matches=18`，`reflection_intent=reflection`，`reflection_pgvector_memories=5`，`planning_intent=planning`，`generated_plan_items=1`，`embedding_dimension=1024`，`pgvector_hits=3`。
+结果：1 test，通过。  
+证据：`record_intent=record_event`，`database_life_event_id=93`，`life_events_api_matches=15`，`reflection_intent=reflection`，`reflection_pgvector_memories=5`，`planning_intent=planning`，`generated_plan_items=1`，`embedding_dimension=1024`，`pgvector_hits=3`。
 
 真实周报 API 补验：
 
