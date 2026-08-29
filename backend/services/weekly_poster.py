@@ -1,8 +1,9 @@
-"""Deterministic SVG poster renderer for weekly reports."""
+"""Render a compact, template-inspired weekly report poster as SVG."""
 
 from __future__ import annotations
 
 import html
+import math
 import textwrap
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
@@ -10,40 +11,34 @@ from typing import Any
 
 
 class WeeklyPosterService:
+    """Create a deterministic journal-style poster while keeping the SVG API."""
+
     WIDTH = 1080
     HEIGHT = 1080
-    LEFT_X = 48
-    RIGHT_X = 556
-    TOP_Y = 48
-    HEADER_H = 92
-    PANEL_Y = 160
-    PANEL_H = 700
-    PANEL_W = 476
-    PANEL_GAP = 32
-    FOOTER_Y = 892
-    FOOTER_H = 140
-    INNER_PAD = 28
+    _FONT = "Microsoft YaHei, PingFang SC, Arial, sans-serif"
+    _INK = "#27323A"
+    _MUTED = "#66737A"
+    _RULE = "#F0ECE2"
+    _PAPER = "#FFFDF8"
+    _CORAL = "#EA8B78"
+    _YELLOW = "#F6C453"
+    _TEAL = "#4D9A9A"
+    _BLUE = "#72A7C8"
+    _MINT = "#9BC7B7"
 
-    _DEFAULT_SECTION_TITLES = (
-        "健康与自律",
-        "工作与学习",
-        "创作与分享",
-        "社交与娱乐",
-        "生活记录",
-    )
-
+    _DEFAULT_SECTION_TITLES = ("健康与自律", "工作与学习", "创作与分享", "社交与娱乐", "生活记录")
     _CATEGORY_COLORS = {
-        "sleep": "#4C78A8",
-        "work": "#F28E2B",
-        "study": "#59A14F",
-        "exercise": "#E15759",
-        "meal": "#EDC948",
-        "social": "#B07AA1",
-        "creative": "#76B7B2",
-        "entertainment": "#FF9DA7",
-        "chores": "#9C755F",
-        "health": "#86BCB6",
-        "other": "#7F8C99",
+        "sleep": _BLUE,
+        "work": _CORAL,
+        "study": _TEAL,
+        "exercise": _MINT,
+        "meal": _YELLOW,
+        "social": "#B79BCB",
+        "creative": "#8FB7CF",
+        "entertainment": "#E8A4A4",
+        "chores": "#B6A084",
+        "health": "#8FBFB2",
+        "other": "#AAB3B5",
     }
 
     def render_poster(self, report: Mapping[str, Any]) -> str:
@@ -51,533 +46,227 @@ class WeeklyPosterService:
         metadata = self._extract_metadata(report)
         overview = self._mapping(payload.get("overview"))
         activity = self._mapping(payload.get("activity_analysis") or payload.get("stats"))
-        section_reviews = self._section_reviews(payload.get("section_reviews"))
+        reviews = self._section_reviews(payload.get("section_reviews"))
         highlights = self._list_of_mappings(payload.get("highlights"))
         completion = self._mapping(payload.get("completion"))
-        suggestions = self._string_list(
-            payload.get("next_week_suggestions") or payload.get("suggestions")
-        )
+        suggestions = self._string_list(payload.get("next_week_suggestions") or payload.get("suggestions"))
 
-        title = self._text(
-            overview.get("title")
-            or f"{metadata['week_start']} 至 {metadata['week_end']} 周报"
-        )
-        theme = self._text(overview.get("theme") or "本周主题未填写")
-        summary = self._text(overview.get("summary") or payload.get("summary") or "本周还没有可展示的摘要。")
-        week_label = self._text(f"{metadata['week_start']} - {metadata['week_end']}")
+        title = self._text(overview.get("title")) or f"{metadata['week_start']} 至 {metadata['week_end']} 周报"
+        theme = self._text(overview.get("theme")) or "把这一周，画成一页清晰的小地图"
+        summary = self._text(overview.get("summary") or payload.get("summary")) or "本周还没有可展示的摘要。"
         total_events = self._int(activity.get("total_events"))
         completion_rate = self._completion_rate(completion)
+        distribution = self._category_distribution(activity, total_events)
+        filled_reviews = self._normalize_reviews(reviews)
 
-        distributions = self._category_distribution(activity, total_events)
-        time_bands = self._time_bands(activity)
-        reviews = self._normalize_reviews(section_reviews)
-        highlights = self._normalize_highlights(highlights)
-        suggestions = suggestions[:3]
+        return "".join([
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.WIDTH}" height="{self.HEIGHT}" viewBox="0 0 {self.WIDTH} {self.HEIGHT}" role="img" aria-label="LifeAgent weekly report poster">',
+            f"<title>{self._escape(title)}</title><desc>{self._escape(summary)}</desc>",
+            f'<rect width="{self.WIDTH}" height="{self.HEIGHT}" fill="{self._PAPER}"/>',
+            self._background_rules(),
+            self._header(title, theme, metadata),
+            self._overview(summary, activity, distribution, total_events),
+            self._completion(completion, completion_rate, filled_reviews, highlights),
+            self._reflection(filled_reviews, suggestions, summary),
+            self._footer(),
+            "</svg>",
+        ])
 
-        if total_events <= 0:
-            left_panel = self._render_empty_left_panel(theme, summary)
-        else:
-            left_panel = self._render_activity_left_panel(
-                total_events,
-                activity,
-                distributions,
-                time_bands,
-            )
-
-        right_panel = self._render_right_panel(
-            reviews,
-            highlights,
-            suggestions,
-        )
-        footer = self._render_footer(theme, completion_rate, metadata)
-
-        return (
-            '<?xml version="1.0" encoding="UTF-8"?>'
-            f'<svg xmlns="http://www.w3.org/2000/svg" '
-            f'xmlns:xlink="http://www.w3.org/1999/xlink" '
-            f'width="{self.WIDTH}" height="{self.HEIGHT}" '
-            f'viewBox="0 0 {self.WIDTH} {self.HEIGHT}" '
-            'role="img" aria-label="LifeAgent weekly report poster">'
-            f"<title>{self._escape(title)}</title>"
-            f"<desc>{self._escape(summary)}</desc>"
-            f'<rect width="{self.WIDTH}" height="{self.HEIGHT}" fill="#F6F8FC"/>'
-            f'{self._header(title, theme, week_label)}'
-            f'{left_panel}'
-            f'{right_panel}'
-            f'{footer}'
-            "</svg>"
-        )
-
-    def _header(self, title: str, theme: str, week_label: str) -> str:
-        return (
-            f'<g>'
-            f'<text x="{self.LEFT_X}" y="94" font-size="38" font-weight="700" fill="#101828" '
-            f'font-family="Arial, sans-serif">{self._escape(title)}</text>'
-            f'<text x="{self.LEFT_X}" y="126" font-size="16" fill="#667085" '
-            f'font-family="Arial, sans-serif">{self._escape(theme)}</text>'
-            f'<rect x="860" y="58" width="172" height="42" rx="21" fill="#111827"/>'
-            f'<text x="946" y="85" text-anchor="middle" font-size="14" font-weight="700" '
-            f'fill="#FFFFFF" font-family="Arial, sans-serif">LifeAgent</text>'
-            f'<text x="1032" y="126" text-anchor="end" font-size="16" fill="#667085" '
-            f'font-family="Arial, sans-serif">{self._escape(week_label)}</text>'
-            f'</g>'
-        )
-
-    def _render_activity_left_panel(
-        self,
-        total_events: int,
-        activity: Mapping[str, Any],
-        distributions: list[dict[str, Any]],
-        time_bands: dict[str, int],
-    ) -> str:
-        summary = self._text(
-            activity.get("summary")
-            or "本周的活动结构已经整理好。"
-        )
-        trend = self._text(activity.get("trend_summary") or "")
-        dominant = self._text(activity.get("dominant_category_label") or "")
-
-        bars = self._render_category_bar(distributions)
-        legend = self._render_category_legend(distributions)
-        time_panel = self._render_time_bands(time_bands)
-
-        return (
-            f'<g>'
-            f'{self._panel_shell(self.LEFT_X, self.PANEL_Y, self.PANEL_W, self.PANEL_H)}'
-            f'<text x="{self.LEFT_X + self.INNER_PAD}" y="202" font-size="24" font-weight="700" '
-            f'fill="#101828" font-family="Arial, sans-serif">活动结构</text>'
-            f'<text x="{self.LEFT_X + self.INNER_PAD}" y="228" font-size="13" fill="#667085" '
-            f'font-family="Arial, sans-serif">{self._escape(summary)}</text>'
-            f'<text x="{self.LEFT_X + self.INNER_PAD}" y="252" font-size="13" fill="#475467" '
-            f'font-family="Arial, sans-serif">{self._escape(dominant or f"共 {total_events} 条记录")}</text>'
-            f'{bars}'
-            f'{legend}'
-            f'{time_panel}'
-            f'<text x="{self.LEFT_X + self.INNER_PAD}" y="836" font-size="13" fill="#667085" '
-            f'font-family="Arial, sans-serif">{self._escape(trend)}</text>'
-            f'</g>'
-        )
-
-    def _render_empty_left_panel(self, theme: str, summary: str) -> str:
-        return (
-            f'<g>'
-            f'{self._panel_shell(self.LEFT_X, self.PANEL_Y, self.PANEL_W, self.PANEL_H)}'
-            f'<text x="{self.LEFT_X + self.INNER_PAD}" y="202" font-size="24" font-weight="700" '
-            f'fill="#101828" font-family="Arial, sans-serif">活动结构</text>'
-            f'<text x="{self.LEFT_X + self.INNER_PAD}" y="240" font-size="13" fill="#667085" '
-            f'font-family="Arial, sans-serif">{self._escape(theme)}</text>'
-            f'<rect x="{self.LEFT_X + self.INNER_PAD}" y="286" width="{self.PANEL_W - self.INNER_PAD * 2}" '
-            f'height="320" rx="20" fill="#F8FAFC" stroke="#D0D5DD"/>'
-            f'<text x="{self.LEFT_X + self.PANEL_W / 2}" y="442" text-anchor="middle" font-size="28" '
-            f'font-weight="700" fill="#101828" font-family="Arial, sans-serif">本周还没有记录</text>'
-            f'<text x="{self.LEFT_X + self.PANEL_W / 2}" y="478" text-anchor="middle" font-size="14" '
-            f'fill="#667085" font-family="Arial, sans-serif">{self._escape(summary)}</text>'
-            f'<text x="{self.LEFT_X + self.PANEL_W / 2}" y="518" text-anchor="middle" font-size="14" '
-            f'fill="#98A2B3" font-family="Arial, sans-serif">先补几条生活记录，周报会更完整。</text>'
-            f'</g>'
-        )
-
-    def _render_category_bar(self, distributions: list[dict[str, Any]]) -> str:
-        x = self.LEFT_X + self.INNER_PAD
-        y = 292
-        width = self.PANEL_W - self.INNER_PAD * 2
-        height = 26
-        if not distributions:
-            return (
-                f'<rect x="{x}" y="{y}" width="{width}" height="{height}" rx="13" fill="#EEF2F6" stroke="#D0D5DD"/>'
-            )
-
-        pieces = []
-        cursor = x
-        total = sum(self._int(item.get("count")) for item in distributions) or 1
-        for index, item in enumerate(distributions):
-            count = self._int(item.get("count"))
-            category = self._text(item.get("category"))
-            color = self._category_color(category)
-            segment_width = width * (count / total)
-            if index == len(distributions) - 1:
-                segment_width = x + width - cursor
-            pieces.append(
-                f'<rect x="{cursor:.2f}" y="{y}" width="{max(segment_width, 0):.2f}" height="{height}" '
-                f'rx="{13 if index in {0, len(distributions) - 1} else 0}" fill="{color}"/>'
-            )
-            cursor += segment_width
-        pieces.append(
-            f'<rect x="{x}" y="{y}" width="{width}" height="{height}" rx="13" fill="none" stroke="#D0D5DD"/>'
-        )
-        return "".join(pieces)
-
-    def _render_category_legend(self, distributions: list[dict[str, Any]]) -> str:
-        if not distributions:
-            return ""
-
-        rows = []
-        start_y = 346
-        row_height = 30
-        for index, item in enumerate(distributions[:5]):
-            y = start_y + index * row_height
-            label = self._text(item.get("category_label") or item.get("category") or "其他")
-            count = self._int(item.get("count"))
-            share = self._float(item.get("share"))
-            color = self._category_color(item.get("category"))
-            rows.append(
-                f'<circle cx="{self.LEFT_X + self.INNER_PAD + 8}" cy="{y - 6}" r="5" fill="{color}"/>'
-                f'<text x="{self.LEFT_X + self.INNER_PAD + 24}" y="{y}" font-size="13" fill="#101828" '
-                f'font-family="Arial, sans-serif">{self._escape(label)}</text>'
-                f'<text x="{self.LEFT_X + self.PANEL_W - self.INNER_PAD}" y="{y}" text-anchor="end" '
-                f'font-size="13" fill="#667085" font-family="Arial, sans-serif">'
-                f'{self._escape(f"{count} 条 · {share:.1f}%")}</text>'
-            )
-        return "".join(rows)
-
-    def _render_time_bands(self, time_bands: Mapping[str, Any]) -> str:
-        order = ("morning", "afternoon", "evening", "night")
-        labels = {
-            "morning": "上午",
-            "afternoon": "下午",
-            "evening": "晚上",
-            "night": "深夜",
-        }
-        values = {band: self._int(time_bands.get(band)) for band in order}
-        max_value = max(values.values()) if values else 0
-        rows = [
-            f'<text x="{self.LEFT_X + self.INNER_PAD}" y="510" font-size="16" font-weight="700" '
-            f'fill="#101828" font-family="Arial, sans-serif">时间分布</text>'
+    def _background_rules(self) -> str:
+        rules = [
+            f'<rect x="0" y="0" width="14" height="{self.HEIGHT}" fill="{self._YELLOW}"/>',
+            f'<rect x="{self.WIDTH - 14}" y="0" width="14" height="{self.HEIGHT}" fill="{self._MINT}"/>',
         ]
-        base_y = 538
-        bar_x = self.LEFT_X + self.INNER_PAD + 80
-        bar_width = self.PANEL_W - self.INNER_PAD * 2 - 120
-        for index, band in enumerate(order):
-            y = base_y + index * 34
-            value = values[band]
-            fill_width = bar_width * (value / max_value) if max_value else 0
-            rows.append(
-                f'<text x="{self.LEFT_X + self.INNER_PAD}" y="{y}" font-size="13" fill="#475467" '
-                f'font-family="Arial, sans-serif">{labels[band]}</text>'
-                f'<rect x="{bar_x}" y="{y - 14}" width="{bar_width}" height="16" rx="8" fill="#EEF2F6"/>'
-                f'<rect x="{bar_x}" y="{y - 14}" width="{fill_width:.2f}" height="16" rx="8" fill="#4C78A8"/>'
-                f'<text x="{self.LEFT_X + self.PANEL_W - self.INNER_PAD}" y="{y}" text-anchor="end" '
-                f'font-size="13" fill="#667085" font-family="Arial, sans-serif">{value}</text>'
-            )
+        for y in range(22, self.HEIGHT, 34):
+            rules.append(f'<rect x="28" y="{y}" width="{self.WIDTH - 56}" height="1" fill="{self._RULE}"/>')
+        return "<g>" + "".join(rules) + "</g>"
+
+    def _header(self, title: str, theme: str, metadata: Mapping[str, str]) -> str:
+        return (
+            "<g>"
+            f'<text x="62" y="74" font-size="24" font-weight="700" letter-spacing="1" fill="{self._CORAL}" font-family="{self._FONT}">WEEKLY LOG</text>'
+            f'<text x="62" y="124" font-size="42" font-weight="700" fill="{self._INK}" font-family="{self._FONT}">{self._escape(title)}</text>'
+            f'<text x="64" y="154" font-size="16" fill="{self._MUTED}" font-family="{self._FONT}">{self._escape(theme)}</text>'
+            f'<text x="1012" y="112" text-anchor="end" font-size="17" font-weight="700" fill="{self._INK}" font-family="{self._FONT}">{self._escape(metadata["week_label"])}</text>'
+            f'<text x="1018" y="145" text-anchor="end" font-size="28" fill="{self._YELLOW}" font-family="{self._FONT}">✦</text>'
+            f'<text x="64" y="194" font-size="16" fill="{self._INK}" font-family="{self._FONT}">本周关键词：{self._escape(self._keyword(metadata, theme))}</text>'
+            f'<text x="1008" y="194" text-anchor="end" font-size="14" fill="{self._MUTED}" font-family="{self._FONT}">状态</text>'
+            "</g>"
+        )
+
+    def _overview(self, summary: str, activity: Mapping[str, Any], distribution: list[dict[str, Any]], total_events: int) -> str:
+        lines = self._wrap(summary, 34, 2)
+        body = self._multiline(64, 304, lines, 17, 25, self._MUTED)
+        trend = self._text(activity.get("trend_summary")) or (f"本周共记录 {total_events} 条生活事件" if total_events else "先补一条生活记录，周报会更完整。")
+        return (
+            "<g>"
+            f'<text x="64" y="244" font-size="19" font-weight="700" fill="{self._INK}" font-family="{self._FONT}">01  本周概览</text>'
+            f'<text x="64" y="270" font-size="14" fill="{self._MUTED}" font-family="{self._FONT}">一句话总结：</text>'
+            f'{body}'
+            f'<text x="64" y="350" font-size="18" font-weight="700" fill="{self._INK}" font-family="{self._FONT}">时间 / 精力分配</text>'
+            f'<text x="64" y="374" font-size="13" fill="{self._MUTED}" font-family="{self._FONT}">记录大致比例即可，数字可替换</text>'
+            f'{self._donut(distribution, total_events)}'
+            f'{self._distribution_labels(distribution)}'
+            f'<text x="64" y="515" font-size="15" font-weight="700" fill="{self._CORAL}" font-family="{self._FONT}">小发现：</text>'
+            f'<text x="170" y="515" font-size="14" fill="{self._MUTED}" font-family="{self._FONT}">{self._escape(self._truncate(trend, 63))}</text>'
+            f'<rect x="62" y="540" width="956" height="1" fill="{self._RULE}"/> '
+            "</g>"
+        )
+
+    def _donut(self, distribution: list[dict[str, Any]], total_events: int) -> str:
+        cx, cy, radius, stroke = 190, 438, 54, 20
+        if not distribution or total_events <= 0:
+            return f'<circle cx="{cx}" cy="{cy}" r="{radius}" fill="none" stroke="#EAE6DC" stroke-width="{stroke}"/><text x="{cx}" y="{cy + 6}" text-anchor="middle" font-size="18" font-weight="700" fill="{self._INK}" font-family="{self._FONT}">本周还没有记录</text>'
+        pieces: list[str] = []
+        start = -math.pi / 2
+        for item in distribution[:6]:
+            value = max(0, self._int(item.get("count"))) / max(1, total_events)
+            end = start + value * math.tau
+            pieces.append(self._arc(cx, cy, radius, start, end, stroke, self._category_color(item.get("category"))))
+            start = end
+        pieces.append(f'<text x="{cx}" y="{cy - 2}" text-anchor="middle" font-size="26" font-weight="700" fill="{self._INK}" font-family="{self._FONT}">{total_events}</text>')
+        pieces.append(f'<text x="{cx}" y="{cy + 18}" text-anchor="middle" font-size="12" fill="{self._MUTED}" font-family="{self._FONT}">本周投入</text>')
+        return "<g>" + "".join(pieces) + "</g>"
+
+    def _arc(self, cx: float, cy: float, radius: float, start: float, end: float, stroke: float, color: str) -> str:
+        x1, y1 = cx + radius * math.cos(start), cy + radius * math.sin(start)
+        x2, y2 = cx + radius * math.cos(end), cy + radius * math.sin(end)
+        large = 1 if end - start > math.pi else 0
+        return f'<path d="M {x1:.2f} {y1:.2f} A {radius} {radius} 0 {large} 1 {x2:.2f} {y2:.2f}" fill="none" stroke="{color}" stroke-width="{stroke}" stroke-linecap="round"/>'
+
+    def _distribution_labels(self, distribution: list[dict[str, Any]]) -> str:
+        rows: list[str] = []
+        for index, item in enumerate(distribution[:4]):
+            x = 390 if index % 2 == 0 else 650
+            y = 425 + (index // 2) * 38
+            label = self._text(item.get("category_label") or item.get("category") or "其他")
+            count, share = self._int(item.get("count")), self._float(item.get("share"))
+            rows.append(f'<circle cx="{x}" cy="{y - 5}" r="6" fill="{self._category_color(item.get("category"))}"/><text x="{x + 16}" y="{y}" font-size="15" fill="{self._INK}" font-family="{self._FONT}">{self._escape(label)}</text><text x="{x + 160}" y="{y}" text-anchor="end" font-size="14" fill="{self._MUTED}" font-family="{self._FONT}">{count} 条 · {share:.0f}%</text>')
         return "".join(rows)
 
-    def _render_right_panel(
-        self,
-        reviews: list[dict[str, Any]],
-        highlights: list[dict[str, Any]],
-        suggestions: list[str],
-    ) -> str:
-        review_rows = []
-        start_y = 252
-        row_height = 72
-        max_reviews = 5
-        filled_reviews = reviews[:max_reviews]
-        if len(filled_reviews) < max_reviews:
-            filled_reviews.extend(
-                {
-                    "title": self._DEFAULT_SECTION_TITLES[index],
-                    "summary": "暂无相关记录。",
-                    "points": [],
-                }
-                for index in range(len(filled_reviews), max_reviews)
-            )
-
-        for index, review in enumerate(filled_reviews[:max_reviews]):
-            y = start_y + index * row_height
-            title = self._text(review.get("title") or self._DEFAULT_SECTION_TITLES[index])
-            summary = self._text(review.get("summary") or "暂无相关记录。")
-            points = self._string_list(review.get("points"))[:2]
-            point_text = "；".join(points)
-            review_rows.append(
-                f'<rect x="{self.RIGHT_X}" y="{y}" width="{self.PANEL_W}" height="66" rx="16" '
-                f'fill="#FFFFFF" stroke="#D0D5DD"/>'
-                f'<text x="{self.RIGHT_X + 18}" y="{y + 24}" font-size="15" font-weight="700" '
-                f'fill="#101828" font-family="Arial, sans-serif">{self._escape(title)}</text>'
-                f'{self._multiline_text(self.RIGHT_X + 18, y + 44, summary, 12, 2, 18, "#344054")}'
-                f'{self._multiline_text(self.RIGHT_X + 18, y + 60, point_text, 11, 1, 16, "#667085")}'
-            )
-
-        highlight_block = self._render_text_block(
-            x=self.RIGHT_X,
-            y=610,
-            width=self.PANEL_W,
-            title="本周高光",
-            lines=[self._text(item.get("summary") or item.get("title") or "") for item in highlights[:3]],
-            empty_text="本周没有明显高光。",
-        )
-        suggestion_block = self._render_text_block(
-            x=self.RIGHT_X,
-            y=742,
-            width=self.PANEL_W,
-            title="下周建议",
-            lines=suggestions[:3],
-            empty_text="先保持连续记录，下周再补全细节。",
-        )
-
+    def _completion(self, completion: Mapping[str, Any], rate: float, reviews: list[dict[str, Any]], highlights: list[dict[str, Any]]) -> str:
+        completed = self._string_list(completion.get("completed"))
+        projects = self._string_list(completion.get("unfinished"))
+        important = self._text(highlights[0].get("summary") or highlights[0].get("title")) if highlights else (completed[0] if completed else "暂无")
+        review_summary = self._text(reviews[0].get("summary")) if reviews else "暂无相关记录。"
         return (
-            f'<g>'
-            f'{self._panel_shell(self.RIGHT_X, self.PANEL_Y, self.PANEL_W, self.PANEL_H)}'
-            f'<text x="{self.RIGHT_X + self.INNER_PAD}" y="202" font-size="24" font-weight="700" '
-            f'fill="#101828" font-family="Arial, sans-serif">模块回顾</text>'
-            f'{self._multiline_text(self.RIGHT_X + self.INNER_PAD, 230, self._normalize_summary(reviews), 13, 1, 18, "#667085")}'
-            f"{''.join(review_rows)}"
-            f'{highlight_block}'
-            f'{suggestion_block}'
-            f'</g>'
+            "<g>"
+            f'<text x="64" y="590" font-size="19" font-weight="700" fill="{self._INK}" font-family="{self._FONT}">02  完成事项</text>'
+            f'<text x="64" y="616" font-size="14" fill="{self._MUTED}" font-family="{self._FONT}">把做完的事打个勾，给自己一个小小的完成感</text>'
+            f'{self._line_item(64, 660, "最重要的一件事", important)}'
+            f'{self._line_item(64, 698, "推进中的项目", projects[0] if projects else "暂无")}'
+            f'{self._line_item(64, 736, "沟通 / 协作", self._text(reviews[1].get("summary")) if len(reviews) > 1 else "暂无")}'
+            f'{self._line_item(64, 774, "生活里的完成", completed[1] if len(completed) > 1 else (completed[0] if completed else "暂无"))}'
+            f'<text x="820" y="666" font-size="14" font-weight="700" fill="{self._CORAL}" font-family="{self._FONT}">完成度</text>'
+            f'<text x="820" y="704" font-size="30" font-weight="700" fill="{self._INK}" font-family="{self._FONT}">{len(completed)} / {len(completed) + len(projects)}</text>'
+            f'<text x="820" y="730" font-size="14" fill="{self._MUTED}" font-family="{self._FONT}">{rate * 100:.0f}% 已完成</text>'
+            f'<rect x="62" y="808" width="956" height="1" fill="{self._RULE}"/> '
+            f'<text x="64" y="836" font-size="13" fill="{self._MUTED}" font-family="{self._FONT}">{self._escape(self._truncate(review_summary, 104))}</text>'
+            "</g>"
         )
 
-    def _render_text_block(
-        self,
-        x: int,
-        y: int,
-        width: int,
-        title: str,
-        lines: Sequence[str],
-        empty_text: str,
-    ) -> str:
-        content = [line for line in lines if self._text(line)]
-        body = content or [empty_text]
-        wrapped_lines: list[str] = []
-        for line in body[:3]:
-            wrapped_lines.extend(self._wrap(line, 28, 1))
-        if not wrapped_lines:
-            wrapped_lines = [empty_text]
+    def _reflection(self, reviews: list[dict[str, Any]], suggestions: list[str], fallback: str) -> str:
+        lesson = self._text(reviews[0].get("summary")) if reviews else fallback
+        next_items = suggestions[:3] or ["先保持连续记录", "留出一段完整休息", "下周再补全细节"]
+        items = "".join(f'<text x="600" y="{944 + index * 24}" font-size="14" fill="{self._INK}" font-family="{self._FONT}">{index + 1}  {self._escape(self._truncate(item, 31))}</text>' for index, item in enumerate(next_items))
         return (
-            f'<rect x="{x}" y="{y}" width="{width}" height="118" rx="16" fill="#F8FAFC" stroke="#D0D5DD"/>'
-            f'<text x="{x + 18}" y="{y + 24}" font-size="15" font-weight="700" fill="#101828" '
-            f'font-family="Arial, sans-serif">{self._escape(title)}</text>'
-            f'{self._multiline_text(x + 18, y + 50, "；".join(wrapped_lines[:3]), 12, 3, 16, "#344054")}'
+            "<g>"
+            f'<text x="64" y="886" font-size="19" font-weight="700" fill="{self._INK}" font-family="{self._FONT}">03  复盘与下周</text>'
+            f'<text x="64" y="918" font-size="15" font-weight="700" fill="{self._BLUE}" font-family="{self._FONT}">这周学到了什么？</text>'
+            f'<text x="64" y="944" font-size="14" fill="{self._MUTED}" font-family="{self._FONT}">{self._escape(self._truncate(lesson, 58))}</text>'
+            f'<text x="600" y="918" font-size="15" font-weight="700" fill="{self._TEAL}" font-family="{self._FONT}">下周只做三件事</text>'
+            f'{items}'
+            "</g>"
         )
 
-    def _render_footer(self, theme: str, completion_rate: float, metadata: Mapping[str, str]) -> str:
-        rate_text = f"完成度 {completion_rate * 100:.0f}%"
-        return (
-            f'<g>'
-            f'<rect x="{self.LEFT_X}" y="{self.FOOTER_Y}" width="{self.PANEL_W * 2 + self.PANEL_GAP}" '
-            f'height="{self.FOOTER_H}" rx="20" fill="#111827"/>'
-            f'<text x="{self.LEFT_X + 24}" y="{self.FOOTER_Y + 38}" font-size="16" fill="#D0D5DD" '
-            f'font-family="Arial, sans-serif">周主题</text>'
-            f'<text x="{self.LEFT_X + 24}" y="{self.FOOTER_Y + 74}" font-size="28" font-weight="700" '
-            f'fill="#FFFFFF" font-family="Arial, sans-serif">{self._escape(theme or "本周主题未填写")}</text>'
-            f'<text x="{self.LEFT_X + 470}" y="{self.FOOTER_Y + 38}" font-size="16" fill="#D0D5DD" '
-            f'font-family="Arial, sans-serif">完成情况</text>'
-            f'<text x="{self.LEFT_X + 470}" y="{self.FOOTER_Y + 74}" font-size="28" font-weight="700" '
-            f'fill="#FFFFFF" font-family="Arial, sans-serif">{self._escape(rate_text)}</text>'
-            f'<text x="{self.LEFT_X + 770}" y="{self.FOOTER_Y + 38}" font-size="16" fill="#D0D5DD" '
-            f'font-family="Arial, sans-serif">品牌</text>'
-            f'<text x="{self.LEFT_X + 770}" y="{self.FOOTER_Y + 74}" font-size="22" font-weight="700" '
-            f'fill="#FFFFFF" font-family="Arial, sans-serif">LifeAgent</text>'
-            f'<text x="{self.LEFT_X + 770}" y="{self.FOOTER_Y + 102}" font-size="13" fill="#9CA3AF" '
-            f'font-family="Arial, sans-serif">{self._escape(metadata["week_label"])}</text>'
-            f'</g>'
-        )
+    def _footer(self) -> str:
+        return f'<g><text x="64" y="1038" font-size="13" font-weight="700" letter-spacing="1" fill="{self._MUTED}" font-family="{self._FONT}">SEE YOU NEXT WEEK</text><text x="1008" y="1038" text-anchor="end" font-size="18" fill="{self._YELLOW}" font-family="{self._FONT}">✦  ✦  ✦</text></g>'
 
-    def _panel_shell(self, x: int, y: int, width: int, height: int) -> str:
-        return (
-            f'<rect x="{x}" y="{y}" width="{width}" height="{height}" rx="24" fill="#FFFFFF" '
-            f'stroke="#D0D5DD"/>'
-        )
+    def _line_item(self, x: int, y: int, label: str, value: str) -> str:
+        return f'<text x="{x}" y="{y}" font-size="14" fill="{self._INK}" font-family="{self._FONT}">{self._escape(label)}：</text><text x="240" y="{y}" font-size="14" fill="{self._MUTED}" font-family="{self._FONT}">{self._escape(self._truncate(value, 44))}</text>'
+
+    def _multiline(self, x: int, y: int, lines: Sequence[str], size: int, line_height: int, fill: str) -> str:
+        if not lines:
+            return ""
+        tspans = "".join(f'<tspan x="{x}" dy="{0 if index == 0 else line_height}">{self._escape(line)}</tspan>' for index, line in enumerate(lines))
+        return f'<text x="{x}" y="{y}" font-size="{size}" fill="{fill}" font-family="{self._FONT}">{tspans}</text>'
+
+    def _keyword(self, metadata: Mapping[str, str], theme: str) -> str:
+        keyword = self._text(theme).split("，", 1)[0].split(" ", 1)[0]
+        return self._truncate(keyword or metadata["week_start"], 16)
 
     def _normalize_reviews(self, reviews: list[dict[str, Any]]) -> list[dict[str, Any]]:
         normalized = list(reviews)
-        if len(normalized) < len(self._DEFAULT_SECTION_TITLES):
-            for index in range(len(normalized), len(self._DEFAULT_SECTION_TITLES)):
-                normalized.append(
-                    {
-                        "title": self._DEFAULT_SECTION_TITLES[index],
-                        "summary": "暂无相关记录。",
-                        "points": [],
-                    }
-                )
+        while len(normalized) < len(self._DEFAULT_SECTION_TITLES):
+            index = len(normalized)
+            normalized.append({"title": self._DEFAULT_SECTION_TITLES[index], "summary": "暂无相关记录。", "points": []})
         return normalized[: len(self._DEFAULT_SECTION_TITLES)]
-
-    def _normalize_highlights(self, highlights: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        if not highlights:
-            return []
-        normalized: list[dict[str, Any]] = []
-        for item in highlights[:3]:
-            normalized.append(
-                {
-                    "title": self._text(item.get("title") or ""),
-                    "summary": self._text(item.get("summary") or ""),
-                }
-            )
-        return normalized
-
-    def _normalize_summary(self, reviews: list[dict[str, Any]]) -> str:
-        if not reviews:
-            return "本周模块回顾仍为空，先补记录再看结构。"
-        summary = self._text(reviews[0].get("summary") or "")
-        return summary or "本周模块回顾已整理完成。"
 
     def _category_distribution(self, activity: Mapping[str, Any], total_events: int) -> list[dict[str, Any]]:
         distribution = activity.get("category_distribution")
-        if isinstance(distribution, Sequence) and not isinstance(distribution, (str, bytes)):
-            normalized: list[dict[str, Any]] = []
-            for item in distribution:
-                if not isinstance(item, Mapping):
-                    continue
-                normalized.append(
-                    {
-                        "category": self._text(item.get("category") or "other"),
-                        "category_label": self._text(item.get("category_label") or item.get("category") or "其他"),
-                        "count": self._int(item.get("count")),
-                        "share": self._float(item.get("share")),
-                    }
-                )
-            if normalized:
-                return normalized[:5]
-        if total_events <= 0:
+        if not isinstance(distribution, Sequence) or isinstance(distribution, (str, bytes)):
             return []
-        return [
-            {
-                "category": "other",
-                "category_label": "其他",
-                "count": total_events,
-                "share": 100.0,
-            }
-        ]
-
-    def _time_bands(self, activity: Mapping[str, Any]) -> dict[str, int]:
-        bands = activity.get("time_bands")
-        base = {"morning": 0, "afternoon": 0, "evening": 0, "night": 0}
-        if not isinstance(bands, Mapping):
-            return base
-        for key in base:
-            base[key] = self._int(bands.get(key))
-        return base
-
-    def _completion_rate(self, completion: Mapping[str, Any]) -> float:
-        value = completion.get("completion_rate")
-        if isinstance(value, (int, float)):
-            return max(0.0, min(1.0, float(value)))
-        completed = completion.get("completed")
-        unfinished = completion.get("unfinished")
-        completed_count = len(completed) if isinstance(completed, Sequence) and not isinstance(completed, (str, bytes)) else 0
-        unfinished_count = len(unfinished) if isinstance(unfinished, Sequence) and not isinstance(unfinished, (str, bytes)) else 0
-        total = completed_count + unfinished_count
-        if not total:
-            return 0.0
-        return completed_count / total
+        items: list[dict[str, Any]] = []
+        for item in distribution:
+            if not isinstance(item, Mapping):
+                continue
+            count = max(0, self._int(item.get("count")))
+            share = self._float(item.get("share"))
+            if share <= 0 and total_events:
+                share = count / total_events * 100
+            items.append({**dict(item), "count": count, "share": share})
+        return sorted(items, key=lambda item: (-self._int(item.get("count")), self._text(item.get("category"))))
 
     def _extract_payload(self, report: Mapping[str, Any]) -> dict[str, Any]:
         if isinstance(report.get("report_data"), Mapping):
             return dict(report["report_data"])
-        if any(key in report for key in ("overview", "activity_analysis", "section_reviews", "highlights")):
-            return dict(report)
-        return {}
+        return dict(report) if any(key in report for key in ("overview", "activity_analysis", "section_reviews", "highlights")) else {}
 
     def _extract_metadata(self, report: Mapping[str, Any]) -> dict[str, str]:
-        week_start = self._format_date(report.get("week_start"))
-        week_end = self._format_date(report.get("week_end"))
-        if not week_start and isinstance(report.get("report_data"), Mapping):
+        start, end = self._format_date(report.get("week_start")), self._format_date(report.get("week_end"))
+        if isinstance(report.get("report_data"), Mapping):
             overview = report["report_data"].get("overview")
             if isinstance(overview, Mapping):
-                week_start = self._format_date(overview.get("week_start"))
-                week_end = self._format_date(overview.get("week_end"))
-        week_start = week_start or "本周"
-        week_end = week_end or "本周"
-        return {
-            "week_start": week_start,
-            "week_end": week_end,
-            "week_label": f"{week_start} - {week_end}",
-        }
+                start, end = start or self._format_date(overview.get("week_start")), end or self._format_date(overview.get("week_end"))
+        start, end = start or "本周", end or "本周"
+        return {"week_start": start, "week_end": end, "week_label": f"{start} - {end}"}
 
     def _format_date(self, value: Any) -> str:
         if isinstance(value, datetime):
             return value.date().isoformat()
         if isinstance(value, date):
             return value.isoformat()
-        text = self._text(value)
-        return text
+        return self._text(value)
 
     def _mapping(self, value: Any) -> dict[str, Any]:
-        if isinstance(value, Mapping):
-            return dict(value)
-        return {}
+        return dict(value) if isinstance(value, Mapping) else {}
 
     def _section_reviews(self, value: Any) -> list[dict[str, Any]]:
-        if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
-            return []
-        reviews: list[dict[str, Any]] = []
-        for item in value:
-            if isinstance(item, Mapping):
-                reviews.append(dict(item))
-        return reviews
+        return [dict(item) for item in value if isinstance(item, Mapping)] if isinstance(value, Sequence) and not isinstance(value, (str, bytes)) else []
 
     def _list_of_mappings(self, value: Any) -> list[dict[str, Any]]:
-        if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
-            return []
-        items: list[dict[str, Any]] = []
-        for item in value:
-            if isinstance(item, Mapping):
-                items.append(dict(item))
-        return items
+        return [dict(item) for item in value if isinstance(item, Mapping)] if isinstance(value, Sequence) and not isinstance(value, (str, bytes)) else []
 
     def _string_list(self, value: Any) -> list[str]:
         if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
             return []
-        items: list[str] = []
+        result: list[str] = []
         for item in value:
             text = self._text(item)
-            if text and text not in items:
-                items.append(text)
-        return items
+            if text and text not in result:
+                result.append(text)
+        return result
 
-    def _render_time_label(self, value: Any) -> str:
-        return self._text(value)
-
-    def _text(self, value: Any) -> str:
-        if value is None:
-            return ""
-        text = str(value)
-        filtered = "".join(ch for ch in text if ch in "\n\r\t" or ord(ch) >= 32)
-        return filtered.strip()
-
-    def _escape(self, value: Any) -> str:
-        return html.escape(self._text(value), quote=True)
-
-    def _multiline_text(
-        self,
-        x: int,
-        y: int,
-        text: Any,
-        size: int,
-        max_lines: int,
-        line_height: int,
-        fill: str,
-    ) -> str:
-        lines = self._wrap(self._text(text), width=max(1, int(28 if size >= 13 else 32)), max_lines=max_lines)
-        if not lines:
-            return ""
-        parts = [
-            f'<text x="{x}" y="{y}" font-size="{size}" fill="{fill}" font-family="Arial, sans-serif">'
-        ]
-        for index, line in enumerate(lines):
-            dy = 0 if index == 0 else line_height
-            parts.append(
-                f'<tspan x="{x}" dy="{dy}">{self._escape(line)}</tspan>'
-            )
-        parts.append("</text>")
-        return "".join(parts)
-
-    def _wrap(self, text: str, width: int, max_lines: int) -> list[str]:
-        normalized = " ".join(text.split())
-        if not normalized:
-            return []
-        lines = textwrap.wrap(
-            normalized,
-            width=width,
-            break_long_words=True,
-            break_on_hyphens=False,
-        )
-        if len(lines) > max_lines:
-            lines = lines[:max_lines]
-            lines[-1] = lines[-1].rstrip("。.!? ，,；;:：") + "…"
-        return lines
+    def _completion_rate(self, completion: Mapping[str, Any]) -> float:
+        value = completion.get("completion_rate")
+        if isinstance(value, (int, float)):
+            return max(0.0, min(1.0, float(value)))
+        completed, unfinished = self._string_list(completion.get("completed")), self._string_list(completion.get("unfinished"))
+        return len(completed) / (len(completed) + len(unfinished)) if completed or unfinished else 0.0
 
     def _category_color(self, category: Any) -> str:
-        return self._CATEGORY_COLORS.get(self._text(category) or "other", self._CATEGORY_COLORS["other"])
+        return self._CATEGORY_COLORS.get(self._text(category), "#AAB3B5")
 
     def _int(self, value: Any) -> int:
         try:
@@ -590,3 +279,25 @@ class WeeklyPosterService:
             return float(value)
         except (TypeError, ValueError):
             return 0.0
+
+    def _text(self, value: Any) -> str:
+        if value is None:
+            return ""
+        return "".join(ch for ch in str(value) if ch in "\n\r\t" or ord(ch) >= 32).strip()
+
+    def _escape(self, value: Any) -> str:
+        return html.escape(self._text(value), quote=True)
+
+    def _wrap(self, value: Any, width: int, max_lines: int) -> list[str]:
+        text = " ".join(self._text(value).split())
+        if not text:
+            return []
+        lines = textwrap.wrap(text, width=width, break_long_words=True, break_on_hyphens=False)
+        if len(lines) > max_lines:
+            lines = lines[:max_lines]
+            lines[-1] = self._truncate(lines[-1], max(1, width - 1)) + "…"
+        return lines
+
+    def _truncate(self, value: Any, length: int) -> str:
+        text = self._text(value)
+        return text if len(text) <= length else text[: max(1, length - 1)] + "…"

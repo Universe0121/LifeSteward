@@ -4,11 +4,13 @@ import Customize from "./pages/Customize";
 import Home from "./pages/Home";
 import Profile from "./pages/Profile";
 import Timeline from "./pages/Timeline";
+import WeeklyReport from "./pages/WeeklyReport";
 
 const navigation = [
   { to: "/", label: "首页", icon: "⌂" },
   { to: "/chat", label: "聊天", icon: "✦" },
   { to: "/timeline", label: "日历", icon: "▣" },
+  { to: "/weekly", label: "周报", icon: "✦" },
   { to: "/profile", label: "画像", icon: "♙" },
   { to: "/customize", label: "定制", icon: "⚙" },
 ];
@@ -21,6 +23,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/chat" element={<ChatHome />} />
           <Route path="/timeline" element={<Timeline />} />
+          <Route path="/weekly" element={<WeeklyReport />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/customize" element={<Customize />} />
         </Routes>
