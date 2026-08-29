@@ -3,7 +3,7 @@
 from contextlib import asynccontextmanager
 from collections.abc import Mapping
 from typing import Any
-from fastapi import FastAPI, Query, Request, status
+from fastapi import FastAPI, File, Form, Query, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -19,6 +19,8 @@ from schemas.weekly_report_schema import (
 from services.chat_service import AgentProcessingError, process_chat_message
 from services.life_event_query_service import LifeEventQueryService
 from services.mock_demo_service import get_demo_agent
+from services.speech_service import SpeechServiceError
+from schemas.speech_schema import SpeechTranscriptionResponse
 from core.composition_root import CompositionRoot, build_composition_root
 
 
@@ -86,6 +88,34 @@ def life_events(
     return LifeEventsResponse(
         items=[LifeEventItem.model_validate(item) for item in items],
         count=len(items),
+    )
+
+
+@app.post("/api/v1/speech-to-text", response_model=SpeechTranscriptionResponse)
+async def speech_to_text(
+    audio: UploadFile = File(...),
+    user_id: int = Form(...),  # noqa: ARG001 - retained for the frozen client contract.
+    language: str = Form("zh-CN"),
+) -> SpeechTranscriptionResponse:
+    """Validate an uploaded recording and delegate transcription to the service layer."""
+
+    root: CompositionRoot | None = getattr(app.state, "composition_root", None)
+    if root is None:
+        raise RuntimeError("Production composition root is not initialized")
+    payload = await audio.read()
+    try:
+        result = root.speech_service.transcribe(
+            payload,
+            audio.filename or "recording.m4a",
+            audio.content_type or "application/octet-stream",
+            language,
+        )
+    except SpeechServiceError as exc:
+        return _error_response(status.HTTP_503_SERVICE_UNAVAILABLE, exc.error_code, exc.message)
+    return SpeechTranscriptionResponse(
+        text=result.text,
+        language=result.language,
+        duration_ms=result.duration_ms,
     )
 
 

@@ -8,6 +8,7 @@ from core.database import DatabaseClient
 from core.llm_service import LLMService, configure_llm_service_from_environment
 from services.weekly_report_service import WeeklyReportService
 from services.memory_service import ToolMemoryService
+from services.speech_service import SpeechService
 from tools.sql_tool import SQLTool
 from tools.vector_search_tool import VectorSearchTool
 
@@ -24,6 +25,7 @@ class CompositionRoot:
     master_agent: MasterAgent
     weekly_report_agent: WeeklyReportAgent
     weekly_report_service: WeeklyReportService
+    speech_service: SpeechService
 
 
 def build_composition_root() -> CompositionRoot:
@@ -40,6 +42,7 @@ def build_composition_root() -> CompositionRoot:
         sql_tool,
         weekly_report_agent=weekly_report_agent,
     )
+    speech_service = SpeechService.from_environment()
     return CompositionRoot(
         llm_service,
         database_client,
@@ -49,4 +52,5 @@ def build_composition_root() -> CompositionRoot:
         master_agent,
         weekly_report_agent,
         weekly_report_service,
+        speech_service,
     )

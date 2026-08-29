@@ -32,5 +32,17 @@ RAG流程设计.png
 backend/.venv*/
 backend/.deps/
 backend/.env
+mobile/.env
+mobile/.expo/
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/app/debug.keystore
+mobile/android/lifeagent-final.png
+mobile/ios/Pods/
+mobile/**/*.m4a
+mobile/**/*.webm
+mobile/**/*.wav
+mobile/*.apk
 __pycache__/
 *.pyc
