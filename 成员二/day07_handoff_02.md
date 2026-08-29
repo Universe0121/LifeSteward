@@ -134,7 +134,7 @@ FastAPI -> SpeechService -> StepFunSpeechProvider
 
 Branch：`codex/feature_day7_expo_mobile_final`
 
-Commit：见本文件提交后的最终 Git commit。
+Commit：`96a048c57a87813f80cad12c88664f701c331dda`（移动端和后端语音适配源码提交；后续仅补充本 handoff 文档）。
 
 基线：执行时网络无法更新远端引用，使用本地 `origin/main`（`05b5daa`）创建分支；推送前会再次尝试 `git fetch origin`。
 
