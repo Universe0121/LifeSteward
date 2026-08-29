@@ -134,7 +134,7 @@ FastAPI -> SpeechService -> StepFunSpeechProvider
 
 Branch：`codex/feature_day7_expo_mobile_final`
 
-Commit：待本次 handoff 提交后填写。
+Commit：`ca67c5096edd9fa362dbd42cba8e5e9d4ca5a0c7`（真实公网联调、APK 构建和交接记录）。
 
 基线：本分支基于 `origin/main` 的现有代码创建；本次未改动 `LifeSteward-main` 下载目录。
 
