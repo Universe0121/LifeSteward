@@ -115,7 +115,7 @@ def create_llm_service_from_environment() -> LLMService:
 
     common_options = {
         "temperature": float(os.getenv("TEMPERATURE", "0.7")),
-        "timeout": float(os.getenv("LLM_TIMEOUT", "30")),
+        "timeout": max(60.0, float(os.getenv("LLM_TIMEOUT", "30"))),
         "max_retries": int(os.getenv("LLM_MAX_RETRIES", "3")),
         "retry_backoff": float(os.getenv("LLM_RETRY_BACKOFF", "0.2")),
     }

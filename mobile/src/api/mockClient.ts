@@ -2,6 +2,7 @@ import type { ApiClient } from './client';
 import type {
   ChatRequest,
   ChatResponse,
+  HealthLiveResponse,
   LifeEvent,
   LifeEventsResponse,
   SpeechTranscriptionResponse,
@@ -172,6 +173,12 @@ export const mock_api_client: ApiClient = {
         configuration: { llm_configured: true, speech_to_text_configured: true },
         application: { composition_root: true },
       },
+    };
+  },
+  async getHealthLive(): Promise<HealthLiveResponse> {
+    return {
+      status: 'ok',
+      service: 'lifeagent-backend',
     };
   },
 };
