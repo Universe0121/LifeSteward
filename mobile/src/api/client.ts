@@ -15,6 +15,7 @@ const default_request_timeout_ms = 30_000;
 const speech_request_timeout_ms = 65_000;
 const default_get_retry_count = 2;
 const retry_delays_ms = [250, 750];
+const default_demo_api_base_url = 'https://jill-lance-iso-its.trycloudflare.com';
 
 export class ApiClientError extends Error {
   readonly status: number;
@@ -88,7 +89,7 @@ const api_config_listeners = new Set<() => void>();
 
 export function get_runtime_api_base_url(): string {
   if (runtime_base_override !== undefined) return runtime_base_override ?? '';
-  return clean_base_url(environment_value('EXPO_PUBLIC_API_BASE_URL'));
+  return clean_base_url(environment_value('EXPO_PUBLIC_API_BASE_URL')) || default_demo_api_base_url;
 }
 
 export function set_runtime_api_base_url(value: string): boolean {
