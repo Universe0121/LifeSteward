@@ -102,3 +102,22 @@ export type WeeklyReportGenerateRequest = {
   week_start?: string;
   timezone?: string;
 };
+
+export type HealthReadyResponse = {
+  status: 'ready' | 'not_ready' | string;
+  service: string;
+  checks: {
+    database?: {
+      connected?: boolean;
+      pgvector?: boolean;
+      migrations?: boolean;
+      missing_tables?: string[];
+    };
+    redis?: { connected?: boolean };
+    configuration?: {
+      llm_configured?: boolean;
+      speech_to_text_configured?: boolean;
+    };
+    application?: { composition_root?: boolean };
+  };
+};

@@ -2,6 +2,8 @@
 
 from contextlib import asynccontextmanager
 from collections.abc import Mapping
+import os
+from pathlib import Path
 from typing import Any
 from fastapi import FastAPI, File, Form, Query, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,13 +24,53 @@ from services.mock_demo_service import get_demo_agent
 from services.speech_service import SpeechServiceError
 from schemas.speech_schema import SpeechTranscriptionResponse
 from core.composition_root import CompositionRoot, build_composition_root
+from core.database import DatabaseClient
+from core.redis_client import RedisClient
+from core.settings import load_settings
+
+try:  # pragma: no cover - optional dependency branch
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - handled by settings at runtime
+    def load_dotenv(*args, **kwargs):  # type: ignore[no-redef]
+        return False
+
+
+load_dotenv(dotenv_path=Path(__file__).resolve().parent / ".env", override=False)
+
+
+def _cors_origins() -> list[str]:
+    configured = os.getenv("LIFESTEWARD_CORS_ORIGINS", "")
+    origins = {
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    }
+    origins.update(
+        item.strip().rstrip("/")
+        for item in configured.split(",")
+        if item.strip()
+    )
+    return sorted(origins)
+
+
+def _cors_origin_regex() -> str:
+    return os.getenv(
+        "LIFESTEWARD_CORS_ORIGIN_REGEX",
+        r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    ).strip()
 
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
     """Assemble production dependencies once when the application starts."""
     if not hasattr(application.state, "composition_root"):
-        application.state.composition_root = build_composition_root()
+        try:
+            application.state.composition_root = build_composition_root()
+            application.state.composition_root_error = False
+        except Exception:
+            # Keep /health/live available when a dependency or configuration is
+            # temporarily unavailable. /health/ready exposes only safe status.
+            application.state.composition_root = None
+            application.state.composition_root_error = True
     yield
 
 
@@ -39,12 +81,103 @@ app = FastAPI(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_origins=_cors_origins(),
+    allow_origin_regex=_cors_origin_regex() or None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health/live", include_in_schema=False)
+def health_live() -> dict[str, str]:
+    """Return process liveness without touching external dependencies."""
+
+    return {"status": "ok", "service": "lifeagent-backend"}
+
+
+def _safe_configuration_status() -> dict[str, bool]:
+    try:
+        settings = load_settings()
+        provider_key = (
+            os.getenv("STEP_API_KEY", "")
+            if settings.llm_provider == "stepfun"
+            else os.getenv("DASHSCOPE_API_KEY", "")
+        )
+        llm_configured = bool(
+            settings.llm_provider
+            and settings.model_name
+            and provider_key.strip()
+        )
+        speech_configured = bool(
+            settings.speech_to_text_base_url
+            and settings.speech_to_text_api_key
+            and settings.speech_to_text_model
+        )
+        return {
+            "llm_configured": llm_configured,
+            "speech_to_text_configured": speech_configured,
+        }
+    except Exception:
+        return {
+            "llm_configured": False,
+            "speech_to_text_configured": False,
+        }
+
+
+@app.get("/health/ready", include_in_schema=False)
+def health_ready() -> JSONResponse:
+    """Report dependency readiness with safe, non-secret component status."""
+
+    try:
+        database = DatabaseClient.from_environment()
+        database_status = database.schema_health_check()
+    except Exception:
+        database_status = {
+            "connected": False,
+            "vector_extension_available": False,
+            "migrations_applied": False,
+            "missing_tables": [],
+        }
+
+    try:
+        redis = RedisClient.from_environment()
+        redis_status = redis.health_check()
+        redis_status = {"connected": bool(redis_status.get("connected"))}
+    except Exception:
+        redis_status = {"connected": False}
+
+    configuration_status = _safe_configuration_status()
+    composition_available = getattr(app.state, "composition_root", None) is not None
+    checks = {
+        "database": {
+            "connected": bool(database_status.get("connected")),
+            "pgvector": bool(database_status.get("vector_extension_available")),
+            "migrations": bool(database_status.get("migrations_applied")),
+            "missing_tables": database_status.get("missing_tables", []),
+        },
+        "redis": redis_status,
+        "configuration": configuration_status,
+        "application": {"composition_root": composition_available},
+    }
+    ready = all(
+        (
+            checks["database"]["connected"],
+            checks["database"]["pgvector"],
+            checks["database"]["migrations"],
+            checks["redis"]["connected"],
+            checks["configuration"]["llm_configured"],
+            checks["application"]["composition_root"],
+        )
+    )
+    return JSONResponse(
+        status_code=status.HTTP_200_OK if ready else status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={
+            "status": "ready" if ready else "not_ready",
+            "service": "lifeagent-backend",
+            "checks": checks,
+        },
+    )
 
 
 @app.get("/demo", include_in_schema=False)

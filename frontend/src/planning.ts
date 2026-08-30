@@ -42,6 +42,10 @@ export function normalize_plan_items(value: unknown): PlanItem[] {
   });
 }
 
+export function plan_identity(item: Pick<PlanItem, "task_name" | "start_time" | "duration_minutes">, plan_date: string): string {
+  return `${plan_date}|${item.start_time}|${item.duration_minutes}|${item.task_name.trim().toLocaleLowerCase()}`;
+}
+
 export function classify_chat_action(user_input: string, response?: ChatResponse): ChatAction {
   const text = user_input.trim();
   if (is_task_only_request(text)) return "task";

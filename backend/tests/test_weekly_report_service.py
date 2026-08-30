@@ -79,6 +79,20 @@ class WeeklyReportServiceTestCase(unittest.TestCase):
         self.assertEqual(result["poster_url"], "/api/v1/weekly-reports/12/poster")
         self.assertNotIn("poster_svg", result)
 
+    def test_get_weekly_report_poster_removes_legacy_web_aria_attributes(self) -> None:
+        self.sql_tool.get_weekly_report_by_id.return_value = {
+            "report_id": 12,
+            "poster_svg": '<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="周报"><title>周报</title></svg>',
+        }
+
+        result = self.service.get_weekly_report_poster(12)
+
+        self.assertIsNotNone(result)
+        self.assertTrue(result.startswith('<svg xmlns="http://www.w3.org/2000/svg"'))
+        self.assertNotIn("role=", result)
+        self.assertNotIn("aria-label", result)
+        self.assertIn("<title>周报</title>", result)
+
     def test_generate_weekly_report_uses_last_completed_week_and_builds_poster_url(self) -> None:
         agent = Mock()
         poster = Mock()

@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { api_client, is_mock_api_mode, type LifeEvent } from '../api';
+import { api_client, is_mock_api_mode, use_api_config_revision, type LifeEvent } from '../api';
 import { useAuth } from '../state/AuthContext';
 import { useWorkspace } from '../state/WorkspaceContext';
 import { add_days, date_from_key, format_date_label, local_date_key, month_label } from '../utils/date';
@@ -63,6 +63,7 @@ export default function TimelineScreen() {
   const navigation = useNavigation<any>();
   const { user_id } = useAuth();
   const { colors } = useWorkspace();
+  const api_config_revision = use_api_config_revision();
   const today = local_date_key();
   const [dates, setDates] = useState(build_date_options);
   const [selected_date, setSelectedDate] = useState(today);
@@ -90,7 +91,7 @@ export default function TimelineScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user_id]);
+  }, [api_config_revision, user_id]);
 
   useEffect(() => {
     void load_events();

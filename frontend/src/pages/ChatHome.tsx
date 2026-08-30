@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { postChat, type ChatHistoryItem, type ChatResponse } from "../api";
+import { getHealthReady, postChat, user_facing_api_error, type ChatHistoryItem, type ChatResponse } from "../api";
 import { useAuth } from "../auth";
 import VoiceInputButton from "../components/VoiceInputButton";
 import { classify_chat_action, extract_task_name, normalize_plan_items, requested_date_key } from "../planning";
@@ -44,8 +44,26 @@ export default function ChatHome() {
   const [messages_ready, setMessagesReady] = useState(false);
   const [sending, setSending] = useState(false);
   const [failed_input, setFailedInput] = useState("");
+  const [connection_state, setConnectionState] = useState<"checking" | "ready" | "error">("checking");
+  const [connection_message, setConnectionMessage] = useState("");
   const handle_transcribed = useCallback((text: string) => setUserInput(text), []);
   const voice_input = useVoiceInput(user_id, handle_transcribed);
+
+  const check_connection = useCallback(async () => {
+    setConnectionState("checking");
+    setConnectionMessage("正在检查后端连接...");
+    try {
+      const health = await getHealthReady();
+      if (health.status !== "ready") throw new Error("backend not ready");
+      setConnectionState("ready");
+      setConnectionMessage("");
+    } catch (error) {
+      setConnectionState("error");
+      setConnectionMessage(user_facing_api_error(error, "后端暂未连接，请检查服务地址。"));
+    }
+  }, []);
+
+  useEffect(() => { void check_connection(); }, [check_connection]);
 
   const commit_messages = useCallback((next_messages: Message[]) => {
     const bounded = next_messages.slice(-200);
@@ -112,9 +130,12 @@ export default function ChatHome() {
       const response = await postChat({ user_id, conversation_id, user_input: content, conversation_history });
       apply_chat_result(content, response);
       commit_messages([...messages_ref.current, { id: message_id("assistant"), role: "assistant", content: response.assistant_response || "已收到你的记录。" }]);
-    } catch {
+    } catch (error) {
+      const message = user_facing_api_error(error, "请求暂时失败，请检查后端连接。");
+      setConnectionState("error");
+      setConnectionMessage(message);
       setFailedInput(content);
-      commit_messages([...messages_ref.current, { id: message_id("error"), role: "assistant", kind: "error", failed_input: content, content: "请求暂时失败，可以重试，或继续用文字记录。" }]);
+      commit_messages([...messages_ref.current, { id: message_id("error"), role: "assistant", kind: "error", failed_input: content, content: `${message} 可以重试，或继续用文字记录。` }]);
     } finally {
       setSending(false);
     }
@@ -126,7 +147,8 @@ export default function ChatHome() {
   }
 
   return <section className="chat-page">
-    <header className="topbar"><div className="brand-mark">L</div><div><span className="eyebrow">LifeAgent</span><h1>AI 生活助手</h1></div><span className="online-dot" aria-label="在线" /></header>
+    <header className="topbar"><div className="brand-mark">L</div><div><span className="eyebrow">LifeAgent</span><h1>AI 生活助手</h1></div><span className={`connection-status ${connection_state}`} role="status"><i aria-hidden="true" />{connection_state === "ready" ? "已连接" : connection_state === "checking" ? "检查中" : "未连接"}</span></header>
+    {connection_state === "error" && <div className="connection-banner" role="alert"><span>{connection_message}</span><button type="button" onClick={() => void check_connection()}>重试</button></div>}
     {!messages_ready ? <div className="empty-state">正在加载聊天记录...</div> : <div className="message-list" aria-live="polite" ref={list_ref}>{messages.map((message) => message.kind === "welcome" ? <article className="chat-intro" key={message.id}><p className="eyebrow">今天，照顾好自己的节奏</p><h2>{message.content.split("\n")[0]}</h2><p>{message.content.split("\n").slice(1).join("\n")}</p></article> : <article className={`message ${message.role}`} key={message.id}><span className="message-avatar">{message.role === "assistant" ? "✦" : "你"}</span><div className={`message-bubble${message.kind === "error" ? " message-error" : ""}`}>{message.content}{message.kind === "error" && <button className="retry-button" onClick={() => void send_message(message.failed_input || failed_input, true)}>重试</button>}</div></article>)}{sending && <div className="typing-indicator">LifeAgent 正在整理你的记录...</div>}</div>}
     <form className="composer" onSubmit={handle_submit}><input aria-label="用户输入" disabled={sending || voice_input.state === "transcribing"} value={user_input} onChange={(event) => setUserInput(event.target.value)} placeholder="说点什么..." /><VoiceInputButton state={voice_input.state} duration_ms={voice_input.duration_ms} error_message={voice_input.error_message} on_start={() => void voice_input.start_recording()} on_stop={() => void voice_input.stop_recording()} on_retry={voice_input.retry} /><button aria-label="发送" disabled={sending || voice_input.state === "transcribing" || !user_input.trim()} type="submit">↑</button></form>
     {voice_input.state !== "error" && <p className="voice-note">语音会先转成文字，你确认后才会发送</p>}

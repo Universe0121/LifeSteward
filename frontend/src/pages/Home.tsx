@@ -20,6 +20,7 @@ export default function Home() {
   const today_tasks = useMemo(() => data.tasks.filter((task) => task.task_date === today), [data.tasks, today]);
   const visible_tasks = today_tasks.filter((task) => task.task_name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   const completed_count = today_tasks.filter((task) => task.completed).length;
+  const today_plans = data.plans.filter((plan) => plan.plan_date === today);
   const project_copy = data.project_description === "创建仪表盘菜单，梳理用户流程" ? "为用户量身定制每日计划" : data.project_description;
 
   return <section className="home-page">
@@ -32,7 +33,7 @@ export default function Home() {
 
     <div className="section-title home-section-title"><h2>项目</h2><Link to="/customize">编辑全部</Link></div>
     <div className="project-scroller">
-      <Link className="project-card dark-card" to="/today-plan"><span className="card-symbol">♙</span><span className="card-arrow">↗</span><h2>今日计划</h2><p>{project_copy}</p><strong>● 进行中 · {data.plans.filter((plan) => plan.plan_date === today).length || today_tasks.length} 个任务</strong></Link>
+      <Link className="project-card dark-card" to="/today-plan"><span className="card-symbol">♙</span><span className="card-arrow">↗</span><h2>今日计划</h2><p>{project_copy}</p><strong>● 进行中</strong><small>计划 {today_plans.length} 项 · 任务 {today_tasks.length} 项</small></Link>
       <Link className="project-card blue-card" to="/sleep"><span className="card-symbol">◔</span><h2>睡眠时间</h2><p>记录总结这一周的作息</p><strong>● 模拟数据 · 近 5 天</strong></Link>
     </div>
 

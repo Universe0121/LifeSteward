@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
-import { api_client, build_mock_poster_svg, is_mock_api_mode } from '../api';
+import { api_client, build_mock_poster_svg, is_mock_api_mode, use_api_config_revision } from '../api';
 import { useWorkspace } from '../state/WorkspaceContext';
 
 type Props = {
@@ -14,6 +14,7 @@ type Props = {
 
 export default function WeeklyPosterPreview({ report_id, poster_url, width, height }: Props) {
   const { colors } = useWorkspace();
+  const api_config_revision = use_api_config_revision();
   const [svg, setSvg] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -48,7 +49,7 @@ export default function WeeklyPosterPreview({ report_id, poster_url, width, heig
     return () => {
       active = false;
     };
-  }, [poster_url, report_id, retry_token]);
+  }, [api_config_revision, poster_url, report_id, retry_token]);
 
   if (loading) {
     return <View style={[styles.fallback, { width, height, backgroundColor: colors.blue }]}><ActivityIndicator color={colors.ink} /></View>;
@@ -56,7 +57,7 @@ export default function WeeklyPosterPreview({ report_id, poster_url, width, heig
 
   if (svg) {
     // SvgXml keeps the server's SVG as vector content on Android and iOS.
-    return <View style={[styles.preview, { width, height, backgroundColor: colors.blue }]}><SvgXml xml={svg} width="100%" height="100%" /></View>;
+    return <View accessible accessibilityRole="image" accessibilityLabel="LifeAgent 周报海报" style={[styles.preview, { width, height, backgroundColor: colors.blue }]}><SvgXml xml={svg} width="100%" height="100%" /></View>;
   }
 
   return <View style={[styles.fallback, { width, height, backgroundColor: colors.blue }]}>

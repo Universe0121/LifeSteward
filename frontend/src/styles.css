@@ -21,6 +21,7 @@ button { cursor: pointer; }
 .project-card h2 { margin: 48px 0 8px; font-size: 22px; }
 .project-card p { margin: 0; min-height: 39px; color: #aaa; font-size: 12px; line-height: 1.6; }
 .project-card strong { display: block; margin-top: 20px; font-size: 11px; }
+.project-card small { display: block; margin-top: 5px; color: #aaa; font-size: 11px; }
 .dark-card { color: white; background: var(--dark); }
 .blue-card { color: var(--ink); background: #e8edfb; }
 .blue-card p { color: #8f96a7; }
@@ -40,6 +41,13 @@ button { cursor: pointer; }
 .brand-mark, .large-avatar { display: grid; place-items: center; background: var(--dark); color: white; font-weight: 800; }
 .brand-mark { width: 38px; height: 38px; border-radius: 13px; }
 .online-dot { width: 9px; height: 9px; margin-left: auto; border-radius: 50%; background: var(--green); }
+.connection-status { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.connection-status i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.connection-status.ready i { background: var(--green); }
+.connection-status.error i { background: #a23c3c; }
+.connection-banner { display: flex; align-items: center; gap: 10px; margin: 0 24px 14px; padding: 11px 13px; border: 1px solid var(--line); border-radius: 13px; color: var(--muted); background: white; font-size: 12px; line-height: 1.5; }
+.connection-banner span { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.connection-banner button { flex: 0 0 auto; padding: 4px 5px; border: 0; color: var(--ink); background: transparent; font-size: 12px; font-weight: 700; }
 .eyebrow { color: var(--muted); font-size: 12px; letter-spacing: 0.02em; }
 .chat-page { min-height: calc(100vh - 86px); padding-bottom: 20px; }
 .chat-intro { margin: 14px 24px 26px; padding: 28px 24px; border-radius: 28px; color: white; background: var(--dark); }

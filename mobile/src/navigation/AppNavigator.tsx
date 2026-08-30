@@ -18,7 +18,7 @@ export type TabParamList = { 首页: undefined; 聊天: undefined; 日历: undef
 export type RootStackParamList = {
   主导航: NavigatorScreenParams<TabParamList>;
   周报详情: { report: WeeklyReportRecord };
-  今日计划: undefined;
+  今日计划: { plan_date?: string } | undefined;
   睡眠详情: undefined;
   任务管理: { edit_task_id?: string; task_date?: string } | undefined;
 };

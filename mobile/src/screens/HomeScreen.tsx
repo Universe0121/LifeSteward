@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { api_client, type WeeklyReportRecord } from '../api';
+import { api_client, use_api_config_revision, type WeeklyReportRecord } from '../api';
 import WeeklyPosterCard from '../components/WeeklyPosterCard';
 import { useAuth } from '../state/AuthContext';
 import { useWorkspace } from '../state/WorkspaceContext';
@@ -12,6 +12,7 @@ export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const { user_id, display_name } = useAuth();
   const { data, colors, toggle_task: toggle_workspace_task } = useWorkspace();
+  const api_config_revision = use_api_config_revision();
   const today = local_date_key();
   const [reports, setReports] = useState<WeeklyReportRecord[]>([]);
   const [report_loading, setReportLoading] = useState(true);
@@ -30,7 +31,7 @@ export default function HomeScreen() {
     } finally {
       setReportLoading(false);
     }
-  }, [user_id]);
+  }, [api_config_revision, user_id]);
 
   useEffect(() => {
     void load_reports();
@@ -108,7 +109,8 @@ export default function HomeScreen() {
           <View style={[styles.card_icon, { backgroundColor: colors.paper }]}><MaterialCommunityIcons color={colors.ink} name="account-heart-outline" size={19} /></View>
           <Text style={[styles.project_title, { color: colors.paper }]}>{data.project_name === '事件提醒' ? '今日计划' : data.project_name}</Text>
           <Text style={[styles.project_copy, { color: colors.muted }]}>{project_copy}</Text>
-          <Text style={[styles.project_status, { color: colors.paper }]}>● 进行中 · {today_plans.length || today_tasks.length} 个任务</Text>
+          <Text style={[styles.project_status, { color: colors.paper }]}>● 进行中</Text>
+          <Text style={[styles.project_counts, { color: colors.muted }]}>计划 {today_plans.length} 项 · 任务 {today_tasks.length} 项</Text>
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="打开睡眠时间详情" onPress={() => open_stack('睡眠详情')} style={[styles.project_card, { backgroundColor: colors.blue }]}>
           <View style={[styles.card_icon, { backgroundColor: colors.paper }]}><MaterialCommunityIcons color={colors.ink} name="moon-waning-crescent" size={19} /></View>
@@ -178,6 +180,7 @@ const styles = StyleSheet.create({
   project_title: { marginTop: 48, marginBottom: 8, fontSize: 22, fontWeight: '700' },
   project_copy: { minHeight: 39, fontSize: 12, lineHeight: 19 },
   project_status: { marginTop: 20, fontSize: 11, fontWeight: '700' },
+  project_counts: { marginTop: 5, fontSize: 11 },
   task_list: { gap: 10, paddingHorizontal: 24 },
   task_row: { minHeight: 58, padding: 14, borderRadius: 17, flexDirection: 'row', alignItems: 'center', gap: 12 },
   checkbox: { width: 28, height: 28, borderWidth: 2, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },

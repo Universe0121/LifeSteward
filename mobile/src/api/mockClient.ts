@@ -7,6 +7,7 @@ import type {
   SpeechTranscriptionResponse,
   WeeklyReportListResponse,
   WeeklyReportRecord,
+  HealthReadyResponse,
 } from './types';
 import timeline_events from '../mocks/timeline_events.json';
 import { is_plan_request, is_task_only_request, normalize_plan_items } from '../domain/planning';
@@ -160,5 +161,17 @@ export const mock_api_client: ApiClient = {
   },
   async getWeeklyPosterSvg(report_id: number): Promise<string> {
     return build_mock_poster_svg(report_id);
+  },
+  async getHealthReady(): Promise<HealthReadyResponse> {
+    return {
+      status: 'ready',
+      service: 'lifeagent-backend',
+      checks: {
+        database: { connected: true, pgvector: true, migrations: true, missing_tables: [] },
+        redis: { connected: true },
+        configuration: { llm_configured: true, speech_to_text_configured: true },
+        application: { composition_root: true },
+      },
+    };
   },
 };

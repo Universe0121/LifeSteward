@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { api_client, type ChatHistoryItem, type ChatResponse } from '../api';
+import { api_client, is_mock_api_mode, use_api_config_revision, user_facing_api_error, type ChatHistoryItem, type ChatResponse } from '../api';
 import VoiceInputButton from '../components/VoiceInputButton';
 import { classify_chat_action, extract_task_name, normalize_plan_items, requested_date_key } from '../domain/planning';
 import { useConversationId } from '../hooks/useConversationId';
@@ -76,6 +77,7 @@ export function history_without_failed_attempt(
 
 export default function ChatScreen() {
   const { colors, add_task, add_plans } = useWorkspace();
+  const api_config_revision = use_api_config_revision();
   const { user_id, display_name } = useAuth();
   const conversation_id = useConversationId(user_id);
   const list_ref = useRef<FlatList<Message>>(null);
@@ -85,6 +87,32 @@ export default function ChatScreen() {
   const [user_input, setUserInput] = useState('');
   const [sending, setSending] = useState(false);
   const [failed_input, setFailedInput] = useState<string | null>(null);
+  const [connection_state, setConnectionState] = useState<'checking' | 'ready' | 'error'>('checking');
+  const [connection_message, setConnectionMessage] = useState('');
+
+  const check_connection = useCallback(async () => {
+    if (is_mock_api_mode()) {
+      setConnectionState('ready');
+      setConnectionMessage('本地演示模式');
+      return;
+    }
+    setConnectionState('checking');
+    setConnectionMessage('正在检查后端连接...');
+    try {
+      const health = await api_client.getHealthReady();
+      if (health.status !== 'ready') throw new Error('backend not ready');
+      setConnectionState('ready');
+      setConnectionMessage('');
+    } catch (error) {
+      setConnectionState('error');
+      setConnectionMessage(user_facing_api_error(error, '后端暂未连接，请检查公网地址。'));
+    }
+  }, [api_config_revision]);
+
+  useFocusEffect(useCallback(() => {
+    void check_connection();
+    return undefined;
+  }, [check_connection]));
 
   const commit_messages = useCallback((next_messages: Message[]) => {
     const bounded_messages = next_messages.slice(-max_saved_messages);
@@ -185,14 +213,17 @@ export default function ChatScreen() {
       });
       apply_chat_result(content, response);
       persist_next_message({ id: `${Date.now()}-assistant`, role: 'assistant', content: response.assistant_response });
-    } catch {
+    } catch (error) {
+      const message = user_facing_api_error(error, '请求暂时失败，请检查后端连接。');
+      setConnectionState('error');
+      setConnectionMessage(message);
       setFailedInput(content);
       persist_next_message({
         id: `${Date.now()}-error`,
         role: 'assistant',
         kind: 'error',
         failed_input: content,
-        content: '请求暂时失败，可以重试，或继续用文字记录。',
+        content: `${message} 可以重试，或继续用文字记录。`,
       });
     } finally {
       setSending(false);
@@ -219,11 +250,15 @@ export default function ChatScreen() {
     </View>;
   }
 
-  return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0} style={[styles.page, { backgroundColor: colors.canvas }]}>
-    <View style={[styles.topbar, { backgroundColor: colors.paper, borderBottomColor: colors.line }]}>
+  // Android already resizes the activity for the IME (adjustResize in the
+  // generated manifest). Applying a second height adjustment hides the
+  // composer behind the keyboard on some devices.
+  return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0} style={[styles.page, { backgroundColor: colors.canvas }]}>
+      <View style={[styles.topbar, { backgroundColor: colors.paper, borderBottomColor: colors.line }]}>
       <View style={styles.brand}><View style={[styles.brand_mark, { backgroundColor: colors.ink }]}><Text style={{ color: colors.paper, fontWeight: '800' }}>L</Text></View><View><Text style={[styles.eyebrow, { color: colors.muted }]}>LifeAgent</Text><Text style={[styles.title, { color: colors.ink }]}>AI 生活助手</Text></View></View>
-      <View style={styles.online}><View style={[styles.dot, { backgroundColor: colors.green }]} /><Text style={[styles.eyebrow, { color: colors.muted }]}>在线</Text></View>
+      <View style={styles.online}><View style={[styles.dot, { backgroundColor: connection_state === 'ready' ? colors.green : connection_state === 'checking' ? colors.muted : colors.danger }]} /><Text style={[styles.eyebrow, { color: colors.muted }]}>{connection_state === 'ready' ? (is_mock_api_mode() ? '本地演示' : '已连接') : connection_state === 'checking' ? '检查中' : '未连接'}</Text></View>
     </View>
+    {connection_state === 'error' && <View style={[styles.connection_banner, { backgroundColor: colors.paper, borderColor: colors.line }]}><Text style={[styles.connection_text, { color: colors.muted }]}>{connection_message}</Text><Pressable accessibilityRole="button" accessibilityLabel="重试后端连接" onPress={() => void check_connection()}><MaterialCommunityIcons color={colors.ink} name="refresh" size={20} /></Pressable></View>}
     {!messages_ready ? <View style={styles.preparing}><ActivityIndicator color={colors.ink} /><Text style={[styles.preparing_text, { color: colors.muted }]}>正在加载聊天记录...</Text></View> : <FlatList
       ref={list_ref}
       style={styles.messages_list}
@@ -274,4 +309,6 @@ const styles = StyleSheet.create({
   send: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   disabled: { opacity: 0.45 },
   footer: { textAlign: 'center', fontSize: 10, marginTop: 7 },
+  connection_banner: { marginHorizontal: 16, marginTop: 10, paddingHorizontal: 13, paddingVertical: 10, borderWidth: 1, borderRadius: 13, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  connection_text: { flex: 1, fontSize: 12, lineHeight: 18 },
 });
