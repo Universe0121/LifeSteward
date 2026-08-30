@@ -1,6 +1,18 @@
 """Schemas for the chat API."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
+
+
+class ChatHistoryItem(BaseModel):
+    """One previously exchanged message supplied by the client."""
+
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=4000)
+
+    class Config:
+        extra = "forbid"
 
 
 class ChatRequest(BaseModel):
@@ -9,6 +21,10 @@ class ChatRequest(BaseModel):
     user_id: int
     conversation_id: str
     user_input: str
+    conversation_history: list[ChatHistoryItem] = Field(
+        default_factory=list,
+        max_length=20,
+    )
 
     class Config:
         extra = "forbid"

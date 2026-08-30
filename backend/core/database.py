@@ -8,6 +8,20 @@ from typing import Any
 
 from core.settings import load_settings
 
+
+REQUIRED_SCHEMA_TABLES = frozenset(
+    {
+        "life_events",
+        "memories",
+        "user_profile",
+        "goals",
+        "plans",
+        "feedbacks",
+        "reflections",
+        "weekly_reports",
+    }
+)
+
 try:  # pragma: no cover - optional dependency branch
     import psycopg
     from psycopg.rows import dict_row
@@ -151,3 +165,48 @@ class DatabaseClient:
                 vector_extension_available=False,
                 error=str(exc),
             ).as_dict()
+
+    def schema_health_check(
+        self,
+        required_tables: frozenset[str] = REQUIRED_SCHEMA_TABLES,
+    ) -> dict[str, Any]:
+        """Check the public schema without exposing database error details."""
+
+        health = self.health_check()
+        if not health.get("connected") or not health.get("vector_extension_available"):
+            return {
+                "connected": bool(health.get("connected")),
+                "vector_extension_available": bool(
+                    health.get("vector_extension_available")
+                ),
+                "migrations_applied": False,
+                "missing_tables": sorted(required_tables),
+            }
+
+        try:
+            rows = self.fetch_all(
+                """
+                SELECT tablename
+                FROM pg_tables
+                WHERE schemaname = 'public'
+                """
+            )
+            existing_tables = {
+                str(row.get("tablename", ""))
+                for row in rows
+                if row.get("tablename")
+            }
+            missing_tables = sorted(required_tables - existing_tables)
+            return {
+                "connected": True,
+                "vector_extension_available": True,
+                "migrations_applied": not missing_tables,
+                "missing_tables": missing_tables,
+            }
+        except Exception:  # pragma: no cover - integration failure path
+            return {
+                "connected": True,
+                "vector_extension_available": True,
+                "migrations_applied": False,
+                "missing_tables": sorted(required_tables),
+            }

@@ -12,6 +12,15 @@ class InteractionAgent:
         self._llm_service = llm_service
 
     def process(self, state: AgentState) -> AgentState:
+        if state["intent"] in {
+            Intent.QUERY_MEMORY.value,
+            Intent.REFLECTION.value,
+        } and not state.get("retrieved_memories"):
+            state["assistant_response"] = self._no_evidence_response(state)
+            return state
+        if state["intent"] == Intent.RECORD_EVENT.value and not state.get("extracted_events"):
+            state["assistant_response"] = self._fallback_response(state)
+            return state
         llm_service = self._llm_service or get_llm_service()
         try:
             state["assistant_response"] = llm_service.generate(
@@ -25,11 +34,18 @@ class InteractionAgent:
                     "current_goal": state["current_goal"],
                     "generated_plan": state["generated_plan"],
                     "reflection_result": state["reflection_result"],
+                    "conversation_history": state.get("conversation_history", []),
                 },
             ).strip()
         except (RuntimeError, ValueError):
             state["assistant_response"] = self._fallback_response(state)
         return state
+
+    @staticmethod
+    def _no_evidence_response(state: AgentState) -> str:
+        if state["intent"] == Intent.REFLECTION.value:
+            return "目前找到的相关记录还不够，我不想替你猜测。再记录几次后，我可以基于真实记录帮你分析。"
+        return "我暂时没有找到与你的问题相关的历史记录。"
 
     def _fallback_response(self, state: AgentState) -> str:
         if state["intent"] == Intent.RECORD_EVENT.value:

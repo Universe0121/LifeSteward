@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "LifeAgent",
+    "slug": "lifeagent-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "lifeagent",
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": { "NSMicrophoneUsageDescription": "LifeAgent 需要麦克风将你的语音转成文字。" }
+    },
+    "android": {
+      "package": "com.lifeagent.mobile",
+      "permissions": ["RECORD_AUDIO"],
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "plugins": ["expo-av", "expo-notifications"]
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "project_name": "事件提醒",
+  "project_description": "创建仪表盘菜单，梳理用户流程",
+  "tasks": [
+    { "task_id": "task_001", "task_name": "完成10道 C++ 题目", "completed": true },
+    { "task_id": "task_002", "task_name": "去操场跑步", "completed": false },
+    { "task_id": "task_003", "task_name": "背50个英语单词", "completed": false }
+  ]
+}

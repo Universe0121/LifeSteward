@@ -24,6 +24,10 @@ class AppSettings:
     dashscope_api_key: str
     dashscope_base_url: str
     temperature: float
+    speech_to_text_base_url: str = ""
+    speech_to_text_api_key: str = ""
+    speech_to_text_model: str = "stepaudio-2.5-asr"
+    speech_to_text_timeout: float = 60.0
 
 
 def load_settings() -> AppSettings:
@@ -35,11 +39,15 @@ def load_settings() -> AppSettings:
         postgres_dsn=os.getenv("POSTGRES_DSN", "").strip(),
         redis_url=os.getenv("REDIS_URL", "").strip(),
         llm_provider=os.getenv("LLM_PROVIDER", "qwen").strip().lower(),
-        model_name=os.getenv("MODEL_NAME", "").strip() or "qwen-plus",
+        model_name=os.getenv("MODEL_NAME", "").strip() or "qwen3.8-max",
         dashscope_api_key=os.getenv("DASHSCOPE_API_KEY", "").strip(),
         dashscope_base_url=os.getenv(
             "DASHSCOPE_BASE_URL",
             DASHSCOPE_COMPATIBLE_BASE_URL,
         ).strip(),
         temperature=float(os.getenv("TEMPERATURE", "0.7")),
+        speech_to_text_base_url=os.getenv("SPEECH_TO_TEXT_BASE_URL", "").strip(),
+        speech_to_text_api_key=os.getenv("SPEECH_TO_TEXT_API_KEY", "").strip(),
+        speech_to_text_model=os.getenv("SPEECH_TO_TEXT_MODEL", "stepaudio-2.5-asr").strip(),
+        speech_to_text_timeout=float(os.getenv("SPEECH_TO_TEXT_TIMEOUT", "60")),
     )

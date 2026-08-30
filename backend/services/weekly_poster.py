@@ -61,7 +61,10 @@ class WeeklyPosterService:
 
         return "".join([
             '<?xml version="1.0" encoding="UTF-8"?>',
-            f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.WIDTH}" height="{self.HEIGHT}" viewBox="0 0 {self.WIDTH} {self.HEIGHT}" role="img" aria-label="LifeAgent weekly report poster">',
+            # Keep the SVG portable for react-native-svg. The native preview
+            # wrapper supplies the accessible image label; SVG XML parsing on
+            # React Native Web treats aria-label as an invalid ariaLabel prop.
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{self.WIDTH}" height="{self.HEIGHT}" viewBox="0 0 {self.WIDTH} {self.HEIGHT}">',
             f"<title>{self._escape(title)}</title><desc>{self._escape(summary)}</desc>",
             f'<rect width="{self.WIDTH}" height="{self.HEIGHT}" fill="{self._PAPER}"/>',
             self._background_rules(),

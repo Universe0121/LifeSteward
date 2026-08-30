@@ -11,6 +11,7 @@ from typing import Any
 from agents.master_agent import MasterAgent
 from agents.state import AgentState
 from core.llm_service import LLMService
+from services.memory_service import InMemoryMemoryService
 
 
 class QueueLLMService(LLMService):
@@ -200,6 +201,16 @@ class MasterAgentFlowTest(unittest.TestCase):
         self.assertEqual(result["intent"], "casual_chat")
         self.assertEqual(result["extracted_events"], [])
         self.assertEqual(result["assistant_response"], "收到。")
+
+    def test_no_memory_query_does_not_allow_an_ungrounded_model_reply(self) -> None:
+        llm_service = QueueLLMService(["我记得你上周每天睡八小时。"])
+        result = MasterAgent(
+            llm_service=llm_service,
+            memory_service=InMemoryMemoryService(),
+        ).process(create_state("最近我的睡眠怎么样？", intent="query_memory"))
+
+        self.assertEqual(result["assistant_response"], "我暂时没有找到与你的问题相关的历史记录。")
+        self.assertEqual(llm_service.calls, [])
 
 
 if __name__ == "__main__":

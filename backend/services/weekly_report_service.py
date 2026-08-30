@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from datetime import date, datetime, time, timedelta, tzinfo, timezone
 from typing import Any
+from xml.etree import ElementTree
 
 from agents.weekly_report_agent import WeeklyReportAgent
 from services.weekly_poster import WeeklyPosterService
@@ -51,6 +52,32 @@ def _string_or_none(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _portable_poster_svg(value: str) -> str:
+    """Remove web-only accessibility attributes from stored poster SVGs.
+
+    Older reports may contain ``role``/``aria-*`` attributes. React Native Web
+    passes those parsed attributes through as camel-cased SVG props, which
+    produces invalid DOM attributes. Parsing the XML keeps the cleanup limited
+    to attributes and avoids altering user-visible text content.
+    """
+
+    try:
+        root = ElementTree.fromstring(value)
+    except (ElementTree.ParseError, ValueError):
+        return value
+
+    for element in root.iter():
+        for attribute in list(element.attrib):
+            local_name = attribute.rsplit("}", 1)[-1]
+            if local_name == "role" or local_name.startswith("aria-"):
+                del element.attrib[attribute]
+    if root.tag == "{http://www.w3.org/2000/svg}svg":
+        # Preserve the conventional <svg> root expected by image consumers;
+        # otherwise ElementTree emits an ns0: prefix for the default namespace.
+        ElementTree.register_namespace("", "http://www.w3.org/2000/svg")
+    return ElementTree.tostring(root, encoding="unicode")
 
 
 class WeeklyReportService:
@@ -197,7 +224,7 @@ class WeeklyReportService:
             return None
         poster_svg = _string_or_none(report.get("poster_svg"))
         if poster_svg:
-            return poster_svg
+            return _portable_poster_svg(poster_svg)
         return self._weekly_poster_service.render_poster(report)
 
     def serialize_weekly_report(self, weekly_report: Mapping[str, Any]) -> dict[str, Any]:

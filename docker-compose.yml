@@ -1,3 +1,5 @@
+name: lifesteward
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -5,7 +7,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${LIFESTEWARD_POSTGRES_PASSWORD:?Set LIFESTEWARD_POSTGRES_PASSWORD to the password in backend/.env}
+      # start_public_demo.ps1 injects the password parsed from backend/.env.
+      # The fallback keeps `docker compose config` usable for a fresh local
+      # checkout; an existing PostgreSQL volume keeps its own password.
+      POSTGRES_PASSWORD: ${LIFESTEWARD_POSTGRES_PASSWORD:-lifesteward-dev}
       POSTGRES_DB: lifesteward
     ports:
       - "5432:5432"

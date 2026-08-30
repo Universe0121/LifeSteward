@@ -36,6 +36,10 @@ def build_agent_state(chat_request: ChatRequest) -> AgentState:
             "user_id": str(chat_request.user_id),
             "conversation_id": chat_request.conversation_id,
             "user_input": chat_request.user_input,
+            "conversation_history": [
+                {"role": item.role, "content": item.content}
+                for item in chat_request.conversation_history
+            ],
         }
     )
     return agent_state
