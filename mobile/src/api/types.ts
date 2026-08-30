@@ -121,3 +121,8 @@ export type HealthReadyResponse = {
     application?: { composition_root?: boolean };
   };
 };
+
+export type HealthLiveResponse = {
+  status: 'ok' | string;
+  service: string;
+};

@@ -56,6 +56,11 @@ export type HealthReadyResponse = {
   checks?: Record<string, unknown>;
 };
 
+export type HealthLiveResponse = {
+  status: "ok" | string;
+  service: string;
+};
+
 export class ApiClientError extends Error {
   status: number;
   error_code?: string;
@@ -188,7 +193,7 @@ export async function request_json<T>(path: string, init: RequestInit = {}, time
 
 export function user_facing_api_error(error: unknown, fallback: string): string {
   if (!(error instanceof ApiClientError)) return fallback;
-  if (error.error_code === "REQUEST_TIMEOUT") return "请求超时，请检查后端或公网隧道后重试。";
+  if (error.error_code === "REQUEST_TIMEOUT") return "请求超时，AI 可能正在处理中，请稍后重试。";
   if (error.status === 502 || error.status === 504) return "公网隧道暂时不可用，请稍后重试。";
   if (error.status === 503) return "后端暂未就绪或公网隧道已断开，请稍后重试。";
   if (error.status === 0) return "网络连接失败，请检查后端服务和公网地址。";
@@ -200,7 +205,7 @@ export async function postChat(chat_request: ChatRequest): Promise<ChatResponse>
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(chat_request),
-  });
+  }, 90_000);
 }
 
 export async function getLifeEvents(user_id: number | string, days = 7): Promise<LifeEventsResponse> {
@@ -243,4 +248,8 @@ export function getWeeklyPosterUrl(report: WeeklyReportRecord): string {
 
 export async function getHealthReady(): Promise<HealthReadyResponse> {
   return request_json<HealthReadyResponse>("/health/ready", {}, 8000, true);
+}
+
+export async function getHealthLive(): Promise<HealthLiveResponse> {
+  return request_json<HealthLiveResponse>("/health/live", {}, 5000, true);
 }

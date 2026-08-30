@@ -1,6 +1,7 @@
 import type {
   ChatRequest,
   ChatResponse,
+  HealthLiveResponse,
   HealthReadyResponse,
   LifeEventsResponse,
   SpeechTranscriptionResponse,
@@ -37,6 +38,7 @@ export type ApiClient = {
   generateWeeklyReport(request: WeeklyReportGenerateRequest): Promise<WeeklyReportRecord>;
   getWeeklyPosterUri(report_id: number, poster_url?: string): string;
   getWeeklyPosterSvg(report_id: number, poster_url?: string): Promise<string>;
+  getHealthLive(): Promise<HealthLiveResponse>;
   getHealthReady(): Promise<HealthReadyResponse>;
 };
 
@@ -225,7 +227,7 @@ export function infer_audio_asset(uri: string): { extension: string; content_typ
 export function user_facing_api_error(error: unknown, fallback: string): string {
   if (!(error instanceof ApiClientError)) return fallback;
   if (error.error_code === 'API_NOT_CONFIGURED') return '尚未配置后端地址（EXPO_PUBLIC_API_BASE_URL），请到定制页测试连接。';
-  if (error.error_code === 'REQUEST_TIMEOUT') return '请求超时，请检查后端或公网隧道后重试。';
+  if (error.error_code === 'REQUEST_TIMEOUT') return '请求超时，AI 可能正在处理中，请稍后重试。';
   if (error.status === 0) return '网络连接失败，请检查后端服务和公网地址。';
   if (error.status === 502 || error.status === 504) return '公网隧道暂时不可用，请稍后重试。';
   if (error.status === 503) return '后端暂未就绪或公网隧道已断开，请稍后重试。';
@@ -353,7 +355,7 @@ export function createApiClient(options: Options = {}): ApiClient {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(request),
-    }),
+    }, 90_000),
     getLifeEvents: (user_id, days = 7) => request_json<LifeEventsResponse>(
       `/api/v1/life-events?user_id=${encodeURIComponent(String(user_id))}&days=${Math.max(1, Math.min(30, Math.trunc(days)))}`,
       {},
@@ -392,6 +394,7 @@ export function createApiClient(options: Options = {}): ApiClient {
     getWeeklyPosterSvg: (report_id, poster_url) => request_text(
       poster_url ? resolve_api_url(poster_url, api_base_url) : `/api/v1/weekly-reports/${report_id}/poster`,
     ),
+    getHealthLive: () => request_json<HealthLiveResponse>('/health/live', {}, 5000, true),
     getHealthReady: () => request_json<HealthReadyResponse>('/health/ready', {}, request_timeout_ms, true),
   };
 }

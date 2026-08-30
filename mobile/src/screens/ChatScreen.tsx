@@ -99,10 +99,10 @@ export default function ChatScreen() {
     setConnectionState('checking');
     setConnectionMessage('正在检查后端连接...');
     try {
-      const health = await api_client.getHealthReady();
-      if (health.status !== 'ready') throw new Error('backend not ready');
+      const health = await api_client.getHealthLive();
+      if (health.status !== 'ok') throw new Error('backend not live');
       setConnectionState('ready');
-      setConnectionMessage('');
+      setConnectionMessage(is_mock_api_mode() ? '本地演示模式' : '后端在线');
     } catch (error) {
       setConnectionState('error');
       setConnectionMessage(user_facing_api_error(error, '后端暂未连接，请检查公网地址。'));
@@ -215,8 +215,6 @@ export default function ChatScreen() {
       persist_next_message({ id: `${Date.now()}-assistant`, role: 'assistant', content: response.assistant_response });
     } catch (error) {
       const message = user_facing_api_error(error, '请求暂时失败，请检查后端连接。');
-      setConnectionState('error');
-      setConnectionMessage(message);
       setFailedInput(content);
       persist_next_message({
         id: `${Date.now()}-error`,

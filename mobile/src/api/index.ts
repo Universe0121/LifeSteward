@@ -27,5 +27,6 @@ export const api_client = {
   generateWeeklyReport: (...args: Parameters<typeof real_api_client.generateWeeklyReport>) => active_client().generateWeeklyReport(...args),
   getWeeklyPosterUri: (...args: Parameters<typeof real_api_client.getWeeklyPosterUri>) => active_client().getWeeklyPosterUri(...args),
   getWeeklyPosterSvg: (...args: Parameters<typeof real_api_client.getWeeklyPosterSvg>) => active_client().getWeeklyPosterSvg(...args),
+  getHealthLive: (...args: Parameters<typeof real_api_client.getHealthLive>) => active_client().getHealthLive(...args),
   getHealthReady: (...args: Parameters<typeof real_api_client.getHealthReady>) => active_client().getHealthReady(...args),
 };
